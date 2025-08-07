@@ -1,3 +1,31 @@
+// 主题切换按钮逻辑
+const themeOrder = ["light", "purelight", "dark"];
+let currentThemeIdx = 0;
+const html = document.documentElement;
+window.addEventListener('DOMContentLoaded', () => {
+  const themeToggle = document.getElementById("theme-toggle");
+  const themeIcon = document.getElementById("theme-icon");
+  function setTheme(idx) {
+    const theme = themeOrder[idx];
+    html.setAttribute("data-theme", theme);
+    // 切换SVG图标
+    if (theme === "dark") {
+      themeIcon.innerHTML = `<svg id=\"icon-sun\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\" style=\"display:block;\"><circle cx=\"12\" cy=\"12\" r=\"5\"/><path d=\"M12 1v2m0 18v2m11-11h-2M3 12H1m16.95 7.07-1.41-1.41M6.34 6.34 4.93 4.93m12.02 0-1.41 1.41M6.34 17.66l-1.41 1.41\"/></svg>`;
+    } else if (theme === "purelight") {
+      themeIcon.innerHTML = `<svg id=\"icon-sun\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\" style=\"display:block;\"><circle cx=\"12\" cy=\"12\" r=\"5\"/><path d=\"M12 1v2m0 18v2m11-11h-2M3 12H1m16.95 7.07-1.41-1.41M6.34 6.34 4.93 4.93m12.02 0-1.41 1.41M6.34 17.66l-1.41 1.41\"/></svg>`;
+    } else {
+      themeIcon.innerHTML = `<svg id=\"icon-moon\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\" style=\"display:block;\"><path d=\"M21 12.79A9 9 0 1 1 11.21 3a7 7 0 0 0 9.79 9.79z\"/></svg>`;
+    }
+  }
+  setTheme(currentThemeIdx);
+  if (themeToggle) {
+    themeToggle.addEventListener("click", () => {
+      currentThemeIdx = (currentThemeIdx + 1) % themeOrder.length;
+      setTheme(currentThemeIdx);
+    });
+  }
+});
+
 import { invoke } from "@tauri-apps/api/core";
 import { open } from "@tauri-apps/plugin-dialog";
 import { listen } from "@tauri-apps/api/event";
@@ -7,6 +35,8 @@ console.log("=== JavaScript 文件已加载 ===");
 
 // 全局变量存储文件信息
 let loadedFiles = [];
+let lastRenameUndoInfo = null;
+let undoRenameButton = null;
 
 // DOM 元素引用
 let dropZone;
@@ -90,6 +120,7 @@ function initializeElements() {
   fileCountElement = document.getElementById("file-count");
   clearAllButton = document.getElementById("clear-all");
   applyRenameButton = document.getElementById("apply-rename");
+  undoRenameButton = document.getElementById("undo-rename");
 
   tabLinks = document.querySelectorAll(".tab-link");
   tabContents = document.querySelectorAll(".tab-content");
@@ -254,11 +285,8 @@ async function handleFilePathsWithFolders(paths) {
 }
 
 function clearTable() {
-                ${hasChange ? previewName : "(无变化)"}
-            </td>
-        `;
-    fileTable.appendChild(row);
-  });
+  if (!fileTable) return;
+  fileTable.innerHTML = '';
 }
 
 function updateFileTable() {
@@ -329,11 +357,17 @@ function setupTabSwitching() {
       // 添加 active class
       btn.classList.add("active");
       const tabId = btn.getAttribute("data-tab");
-      document.getElementById(tabId).classList.add("active");
+      const tabContent = document.getElementById(tabId);
+      if (tabContent) {
+        tabContent.classList.add("active");
+      }
+      
       updatePreview();
     });
   });
 }
+// 确保初始化时setupTabSwitching被调用
+// 已在initializeEventListeners中调用，无需重复调用
 
 // 实时预览相关
 function setupRealTimePreview() {
@@ -450,6 +484,25 @@ function getPreviewForSequence(fileName, withHighlight = false) {
 
 // 按钮事件相关
 function setupButtonEvents() {
+  // 撤销按钮事件
+  if (undoRenameButton) {
+    undoRenameButton.addEventListener("click", async () => {
+      if (!lastRenameUndoInfo) return;
+      try {
+        const result = await invoke("undo_rename", lastRenameUndoInfo);
+        if (result.success) {
+          alert("已撤销上一次重命名");
+          undoRenameButton.disabled = true;
+          lastRenameUndoInfo = null;
+        } else {
+          alert(result.error_message || "撤销失败");
+        }
+      } catch (error) {
+        alert("撤销操作发生错误: " + error.message);
+      }
+    });
+  }
+
   // 清空按钮
   clearAllButton.addEventListener("click", () => {
     // 清空文件列表
@@ -568,6 +621,14 @@ async function executeRename(filePaths, activeTabId, ruleData) {
     if (result.success) {
       if (result.renamed_count > 0) {
         alert(`成功重命名 ${result.renamed_count} 个文件`);
+        // 保存撤销信息
+        if (Array.isArray(result.undo_info)) {
+          lastRenameUndoInfo = { undo_map: result.undo_info };
+          if (undoRenameButton) undoRenameButton.disabled = false;
+        } else {
+          lastRenameUndoInfo = null;
+          if (undoRenameButton) undoRenameButton.disabled = true;
+        }
         loadedFiles = [];
         clearTable();
         updateFileCount();

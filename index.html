@@ -78,6 +78,7 @@ aside {
         display: block;
       }
     </style>
+    <link rel="stylesheet" href="src/styles.css" />
   </head>
   <body>
     <header style="padding-bottom: 0.5rem;">
@@ -86,6 +87,14 @@ aside {
     <h2 style="margin: 0;">文件批量重命名</h2>
   </div>
 </header>
+<!-- 主题切换按钮 -->
+<button id="theme-toggle" style="position: absolute; top: 18px; right: 22px; background: none; border: none; cursor: pointer; z-index: 99; opacity: 0.74;">
+  <span id="theme-icon" aria-label="切换主题" style="display:inline-block;width:28px;height:28px;vertical-align:middle;">
+    <!-- SVG 默认月亮 -->
+    <svg id="icon-moon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:block;"><path d="M21 12.79A9 9 0 1 1 11.21 3a7 7 0 0 0 9.79 9.79z"/></svg>
+  </span>
+</button>
+
 
     <main>
       <section style="display: flex; flex-direction: column; height:100%;">
@@ -190,8 +199,9 @@ aside {
           </div>
         </div>
         <div style="display: flex; gap: 1rem; margin-top: 1rem;">
-  <button id="clear-all" class="secondary" style="flex:1;">全部清空</button>
   <button id="apply-rename" class="contrast" style="flex:1;">执行重命名</button>
+  <button id="undo-rename" class="outline" style="flex:1;" disabled>撤销重命名</button>
+  <button id="clear-all" class="secondary" style="flex:1;">全部清空</button>
 </div>
       </aside>
 
@@ -606,5 +616,6 @@ aside {
         });
       }
     </script>
-  </body>
+  <script type="module" src="src/main.js"></script>
+</body>
 </html>
