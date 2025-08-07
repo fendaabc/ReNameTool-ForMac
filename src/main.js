@@ -249,10 +249,27 @@ async function setupTauriDragDrop() {
 }
 
 async function handleFilePathsWithFolders(paths) {
+  // 显示加载中提示
+  const fileCountElem = document.getElementById('file-count');
+  let loadingBackup = '';
+  if (fileCountElem) {
+    loadingBackup = fileCountElem.textContent;
+    fileCountElem.textContent = '正在加载文件，请稍候...';
+  }
+  let timeoutId = null;
   try {
+    // 超时保护（如10秒未返回，提示用户）
+    let timedOut = false;
+    timeoutId = setTimeout(() => {
+      timedOut = true;
+      if (fileCountElem) fileCountElem.textContent = '加载文件超时，请检查文件夹内容或重试';
+      alert('文件夹内容过大或处理超时，请稍后重试或分批导入。');
+    }, 10000);
+
     console.log("处理路径（可能包含文件夹）:", paths);
-    // 调用 Rust 后端来展开文件夹中的文件
     const allFilePaths = await invoke("get_files_from_paths", { paths });
+    if (timedOut) return;
+    clearTimeout(timeoutId);
     console.log("展开后的所有文件:", allFilePaths);
     // 支持的扩展名（常见图片/文档/视频/压缩包等）
     const allowedExts = [
@@ -263,6 +280,12 @@ async function handleFilePathsWithFolders(paths) {
     // 清空现有文件和表格
     loadedFiles = [];
     clearTable();
+    // 统计文件夹数量（只统计目录路径）
+    let folderCount = 0;
+    paths.forEach((p) => {
+      // 简单判断：不是以.扩展名结尾的路径视为文件夹
+      if (!p.split('/').pop().includes('.')) folderCount++;
+    });
     // 过滤并收集支持的文件
     allFilePaths.forEach((filePath) => {
       const fileName = filePath.split("/").pop() || filePath.split("\\").pop();
@@ -275,12 +298,23 @@ async function handleFilePathsWithFolders(paths) {
     updateFileTable();
     updateFileCount();
     updatePreview();
+    // 显示统计信息
+    const fileCountElem = document.getElementById('file-count');
+    if (fileCountElem) {
+      fileCountElem.textContent = `已加载 ${loadedFiles.length} 个文件` + (folderCount > 0 ? `，${folderCount} 个文件夹` : '');
+    }
     // 空状态提示行显示/隐藏
     const emptyRow = document.getElementById('empty-tip-row');
     if (emptyRow) emptyRow.style.display = loadedFiles.length === 0 ? '' : 'none';
+    // 空文件夹或无有效文件时友好提示
+    if (loadedFiles.length === 0) {
+      alert(folderCount > 0 ? '未检测到可导入的文件，可能文件夹为空或不包含支持的文件类型。' : '未检测到可导入的文件。');
+    }
   } catch (error) {
     console.error("处理文件路径失败:", error);
     alert("处理文件路径失败: " + error.message);
+  } finally {
+    if (fileCountElem) fileCountElem.textContent = loadingBackup;
   }
 }
 
