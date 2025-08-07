@@ -111,12 +111,12 @@ aside {
     <button id="select-folder-btn" class="outline">选择文件夹</button>
   </div>
   <span style="font-size:0.98em;color:var(--pico-primary);font-weight:500;">可拖拽文件/文件夹或点击按钮导入</span>
-  <span style="font-size:0.89em;color:#888;">仅支持常见图片、文档、视频等类型，其他类型将自动过滤</span>
+
 </div>
 <hr style="margin:0.6rem 0 1.1rem 0;border:0;border-top:1.5px dashed #e0e8ef;">
 
         <div style="flex: 1; display: flex; flex-direction: column;">
-          <div class="overflow-auto" style="flex: 1; min-height: 100px;">
+          <div class="file-list-scroll" style="flex:1 1 auto;max-height:60vh;min-height:180px;overflow:auto;border-radius:8px;box-shadow:0 1px 6px #0001;">
   <table style="width:100%; font-size: 0.9em;">
     <thead>
       <tr>
@@ -226,6 +226,7 @@ aside {
         <div style="display: flex; gap: 1rem; margin-top: 1rem;">
   <button id="apply-rename" class="primary-action" style="flex:1;">执行重命名</button>
   <button id="undo-rename" class="secondary-action" style="flex:1;">撤销重命名</button>
+  <button id="redo-rename" class="secondary-action" style="flex:1;">重做</button>
   <button id="clear-all" class="danger-action" style="flex:1;">全部清空</button>
 </div>
 

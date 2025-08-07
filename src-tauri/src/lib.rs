@@ -2,6 +2,20 @@ use std::fs;
 use std::path::{Path, PathBuf};
 use std::collections::HashMap;
 use serde::{Deserialize, Serialize};
+use std::sync::Mutex;
+#[macro_use]
+extern crate lazy_static;
+
+// 多步撤销/重做历史结构
+#[derive(Clone, Serialize, Deserialize, Debug)]
+pub struct RenameHistory {
+    pub operations: Vec<(String, String)>, // (from, to)
+}
+
+lazy_static::lazy_static! {
+    pub static ref RENAME_HISTORY_STACK: Mutex<Vec<RenameHistory>> = Mutex::new(Vec::new());
+    pub static ref REDO_HISTORY_STACK: Mutex<Vec<RenameHistory>> = Mutex::new(Vec::new());
+}
 
 #[derive(Serialize, Deserialize)]
 struct FileInfo {
@@ -37,7 +51,7 @@ pub enum RenameRule {
     #[serde(rename = "sequence")]
     Sequence { start: usize, digits: usize, position: String },
     #[serde(rename = "case")]
-    Case { caseType: String },
+    Case { #[serde(rename = "caseType")] case_type: String },
 }
 
 #[tauri::command]
@@ -132,6 +146,82 @@ async fn rename_files(operations: Vec<RenameOperation>) -> Result<RenameResult, 
 }
 
 #[tauri::command]
+async fn redo_rename() -> Result<ExecuteRenameResult, String> {
+    use std::fs;
+    let mut redo_stack = REDO_HISTORY_STACK.lock().unwrap();
+    if let Some(history) = redo_stack.pop() {
+        let mut stack = RENAME_HISTORY_STACK.lock().unwrap();
+        let mut success_count = 0;
+        let mut errors = Vec::new();
+        // 顺序重做
+        for (from, to) in history.operations.iter() {
+            match fs::rename(from, to) {
+                Ok(_) => success_count += 1,
+                Err(e) => errors.push(format!("重做失败 {}: {}", from, e)),
+            }
+        }
+        stack.push(history);
+        if errors.is_empty() {
+            Ok(ExecuteRenameResult {
+                success: true,
+                renamed_count: success_count,
+                error_message: None,
+            })
+        } else {
+            Ok(ExecuteRenameResult {
+                success: false,
+                renamed_count: success_count,
+                error_message: Some(errors.join("; ")),
+            })
+        }
+    } else {
+        Ok(ExecuteRenameResult {
+            success: false,
+            renamed_count: 0,
+            error_message: Some("没有可重做的历史记录".to_string()),
+        })
+    }
+}
+
+#[tauri::command]
+async fn undo_rename() -> Result<ExecuteRenameResult, String> {
+    use std::fs;
+    let mut stack = RENAME_HISTORY_STACK.lock().unwrap();
+    if let Some(history) = stack.pop() {
+        let mut redo_stack = REDO_HISTORY_STACK.lock().unwrap();
+        let mut success_count = 0;
+        let mut errors = Vec::new();
+        // 逆序撤销
+        for (from, to) in history.operations.iter().rev() {
+            match fs::rename(to, from) {
+                Ok(_) => success_count += 1,
+                Err(e) => errors.push(format!("撤销失败 {}: {}", to, e)),
+            }
+        }
+        redo_stack.push(history);
+        if errors.is_empty() {
+            Ok(ExecuteRenameResult {
+                success: true,
+                renamed_count: success_count,
+                error_message: None,
+            })
+        } else {
+            Ok(ExecuteRenameResult {
+                success: false,
+                renamed_count: success_count,
+                error_message: Some(errors.join("; ")),
+            })
+        }
+    } else {
+        Ok(ExecuteRenameResult {
+            success: false,
+            renamed_count: 0,
+            error_message: Some("没有可撤销的历史记录".to_string()),
+        })
+    }
+}
+
+#[tauri::command]
 async fn execute_rename(file_paths: Vec<String>, rule: RenameRule) -> Result<ExecuteRenameResult, String> {
     if file_paths.is_empty() {
         return Ok(ExecuteRenameResult {
@@ -202,7 +292,7 @@ async fn execute_rename(file_paths: Vec<String>, rule: RenameRule) -> Result<Exe
                 seq += 1;
             }
         }
-        RenameRule::Case { caseType } => {
+        RenameRule::Case { case_type } => {
             for file_path in &file_paths {
                 let old_path = PathBuf::from(file_path);
                 let parent_dir = old_path.parent().unwrap_or(Path::new("."));
@@ -212,7 +302,7 @@ async fn execute_rename(file_paths: Vec<String>, rule: RenameRule) -> Result<Exe
                 } else {
                     (file_name, "")
                 };
-                let new_base_name = match caseType.as_str() {
+                let new_base_name = match case_type.as_str() {
                     "upper" => format!("{}{}", name.to_uppercase(), ext),
                     "lower" => format!("{}{}", name.to_lowercase(), ext),
                     "capitalize" => {
@@ -245,28 +335,28 @@ async fn execute_rename(file_paths: Vec<String>, rule: RenameRule) -> Result<Exe
     // 第三步：执行重命名操作
     let mut success_count = 0;
     let mut errors = Vec::new();
+    let mut op_history: Vec<(String, String)> = Vec::new();
 
     for (old_path, new_path) in rename_map {
         match fs::rename(&old_path, &new_path) {
             Ok(_) => {
                 success_count += 1;
-                println!("成功重命名: {} -> {}", 
-                    old_path.display(), 
-                    new_path.display()
-                );
-            }
+                op_history.push((old_path.to_string_lossy().to_string(), new_path.to_string_lossy().to_string()));
+            },
             Err(e) => {
-                let error_msg = format!("重命名失败 {} -> {}: {}", 
-                    old_path.display(), 
-                    new_path.display(), 
-                    e
-                );
-                errors.push(error_msg);
+                errors.push(format!("重命名失败 {}: {}", old_path.display(), e));
             }
         }
     }
 
-    // 返回结果
+    // 历史入栈，清空redo栈
+    if !op_history.is_empty() {
+        let mut stack = RENAME_HISTORY_STACK.lock().unwrap();
+        stack.push(RenameHistory { operations: op_history });
+        let mut redo_stack = REDO_HISTORY_STACK.lock().unwrap();
+        redo_stack.clear();
+    }
+
     if errors.is_empty() {
         Ok(ExecuteRenameResult {
             success: true,
@@ -310,7 +400,7 @@ pub fn run() {
     tauri::Builder::default()
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_dialog::init())
-        .invoke_handler(tauri::generate_handler![select_files, rename_files, execute_rename, get_files_from_paths])
+        .invoke_handler(tauri::generate_handler![select_files, rename_files, execute_rename, get_files_from_paths, undo_rename, redo_rename])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
 }

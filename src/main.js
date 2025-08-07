@@ -1,3 +1,48 @@
+// 统一错误提示函数（顶部toast横幅）
+function showErrorMsg(msg, isSuccess = false) {
+  if (typeof msg === 'object' && msg !== null) {
+    msg = msg.error_message || msg.message || JSON.stringify(msg);
+  }
+  // 常见错误归纳
+  if (!isSuccess) {
+    if (msg.includes('EACCES') || msg.includes('权限')) msg = '操作被拒绝：请检查文件权限';
+    else if (msg.includes('busy') || msg.includes('占用')) msg = '文件被占用或正在使用，无法操作';
+    else if (msg.includes('not found') || msg.includes('不存在')) msg = '目标文件不存在';
+    else if (msg.includes('conflict') || msg.includes('重名')) msg = '存在重名冲突，请检查文件名';
+    else if (msg.includes('timeout') || msg.includes('超时')) msg = '操作超时，请重试或分批导入';
+  }
+  let toast = document.getElementById('toast-banner');
+  if (!toast) {
+    toast = document.createElement('div');
+    toast.id = 'toast-banner';
+    toast.style.position = 'fixed';
+    toast.style.top = '24px';
+    toast.style.left = '50%';
+    toast.style.transform = 'translateX(-50%)';
+    toast.style.zIndex = '9999';
+    toast.style.minWidth = '220px';
+    toast.style.maxWidth = '90vw';
+    toast.style.padding = '0.8em 1.7em';
+    toast.style.borderRadius = '1.6em';
+    toast.style.fontSize = '1.07em';
+    toast.style.fontWeight = '600';
+    toast.style.boxShadow = '0 4px 32px #0002';
+    toast.style.textAlign = 'center';
+    toast.style.transition = 'opacity 0.3s';
+    document.body.appendChild(toast);
+  }
+  toast.style.opacity = '1';
+  toast.style.background = isSuccess ? '#e7fbe7' : '#fff3f3';
+  toast.style.color = isSuccess ? '#1a7f1a' : '#c00';
+  toast.style.border = isSuccess ? '1.5px solid #8be28b' : '1.5px solid #ffb3b3';
+  toast.textContent = (isSuccess ? '✅ ' : '❌ ') + msg;
+  clearTimeout(toast._timeoutId);
+  toast._timeoutId = setTimeout(() => {
+    toast.style.opacity = '0';
+    setTimeout(() => { if (toast.parentNode) toast.parentNode.removeChild(toast); }, 400);
+  }, 3200);
+}
+
 // 主题切换按钮逻辑
 const themeOrder = ["light", "purelight", "dark"];
 let currentThemeIdx = 0;
@@ -37,6 +82,27 @@ console.log("=== JavaScript 文件已加载 ===");
 let loadedFiles = [];
 let lastRenameUndoInfo = null;
 let undoRenameButton = null;
+// 多步操作历史栈
+let undoStack = [];
+let redoStack = [];
+
+// 操作历史持久化
+function saveHistory() {
+  localStorage.setItem('renameUndoStack', JSON.stringify(undoStack));
+  localStorage.setItem('renameRedoStack', JSON.stringify(redoStack));
+}
+function loadHistory() {
+  try {
+    const u = localStorage.getItem('renameUndoStack');
+    const r = localStorage.getItem('renameRedoStack');
+    undoStack = u ? JSON.parse(u) : [];
+    redoStack = r ? JSON.parse(r) : [];
+  } catch (e) {
+    undoStack = [];
+    redoStack = [];
+  }
+}
+
 
 // DOM 元素引用
 let dropZone;
@@ -58,6 +124,8 @@ let positionRadios;
 
 // 初始化
 document.addEventListener("DOMContentLoaded", function () {
+  loadHistory();
+  updateUndoRedoButtons();
   console.log("=== DOM 已加载，开始初始化 ===");
   
   initializeElements();
@@ -185,7 +253,7 @@ function setupFileHandling() {
       }
     } catch (error) {
       console.error("文件夹选择失败:", error);
-      alert("文件夹选择失败: " + error.message);
+      showErrorMsg("文件夹选择失败: " + error.message);
     }
   });
 
@@ -263,56 +331,43 @@ async function handleFilePathsWithFolders(paths) {
     timeoutId = setTimeout(() => {
       timedOut = true;
       if (fileCountElem) fileCountElem.textContent = '加载文件超时，请检查文件夹内容或重试';
-      alert('文件夹内容过大或处理超时，请稍后重试或分批导入。');
     }, 10000);
 
-    console.log("处理路径（可能包含文件夹）:", paths);
-    const allFilePaths = await invoke("get_files_from_paths", { paths });
-    if (timedOut) return;
+    // 调用 Tauri 后端递归获取所有文件
+    const files = await invoke('list_files', { paths });
     clearTimeout(timeoutId);
-    console.log("展开后的所有文件:", allFilePaths);
-    // 支持的扩展名（常见图片/文档/视频/压缩包等）
-    const allowedExts = [
-      'jpg','jpeg','png','gif','bmp','webp','svg','heic','tiff',
-      'pdf','doc','docx','xls','xlsx','ppt','pptx','txt','md','csv',
-      'mp4','mov','avi','mkv','webm','mp3','wav','aac','flac','zip','rar','7z','tar','gz'
-    ];
-    // 清空现有文件和表格
-    loadedFiles = [];
-    clearTable();
-    // 统计文件夹数量（只统计目录路径）
-    let folderCount = 0;
-    paths.forEach((p) => {
-      // 简单判断：不是以.扩展名结尾的路径视为文件夹
-      if (!p.split('/').pop().includes('.')) folderCount++;
-    });
-    // 过滤并收集支持的文件
-    allFilePaths.forEach((filePath) => {
-      const fileName = filePath.split("/").pop() || filePath.split("\\").pop();
-      const ext = fileName.includes('.') ? fileName.split('.').pop().toLowerCase() : '';
-      if (allowedExts.includes(ext)) {
-        loadedFiles.push({ name: fileName, path: filePath });
+    if (timedOut) return;
+
+    // 权限检测：检查每个文件的读写权限
+    let checkedFiles = [];
+    for (const f of files) {
+      try {
+        const perm = await invoke('check_file_permission', { path: f });
+        checkedFiles.push({ name: f.split(/[\\/]/).pop(), path: f, readable: perm.readable, writable: perm.writable });
+      } catch (e) {
+        checkedFiles.push({ name: f.split(/[\\/]/).pop(), path: f, readable: false, writable: false });
       }
-    });
-    // 更新显示
+    }
+    loadedFiles = checkedFiles;
     updateFileTable();
     updateFileCount();
+
     updatePreview();
-    // 显示统计信息
+    // 只显示文件数量统计
     const fileCountElem = document.getElementById('file-count');
     if (fileCountElem) {
-      fileCountElem.textContent = `已加载 ${loadedFiles.length} 个文件` + (folderCount > 0 ? `，${folderCount} 个文件夹` : '');
+      fileCountElem.textContent = `已加载 ${loadedFiles.length} 个文件`;
     }
     // 空状态提示行显示/隐藏
     const emptyRow = document.getElementById('empty-tip-row');
     if (emptyRow) emptyRow.style.display = loadedFiles.length === 0 ? '' : 'none';
     // 空文件夹或无有效文件时友好提示
     if (loadedFiles.length === 0) {
-      alert(folderCount > 0 ? '未检测到可导入的文件，可能文件夹为空或不包含支持的文件类型。' : '未检测到可导入的文件。');
+      showErrorMsg('未检测到可导入的文件。');
     }
   } catch (error) {
     console.error("处理文件路径失败:", error);
-    alert("处理文件路径失败: " + error.message);
+    showErrorMsg("处理文件路径失败: " + error.message);
   } finally {
     if (fileCountElem) fileCountElem.textContent = loadingBackup;
   }
@@ -339,37 +394,31 @@ function updateFileTable() {
   const nameSet = new Set();
   let hasConflict = false;
   let illegalRows = [];
-  previewNames.forEach((name, idx) => {
-    // 检查非法字符
-    if (/[\\/:*?"<>|]/.test(name)) {
-      illegalRows.push(idx);
-      hasConflict = true;
-    }
-    // 检查重名
-    if (nameSet.has(name)) {
-      hasConflict = true;
-    } else {
-      nameSet.add(name);
-    }
-  });
-  // 渲染表格
   loadedFiles.forEach((fileInfo, index) => {
-    const previewHTML = getPreviewName(fileInfo.name, true);
-    const hasChange = previewHTML && !previewHTML.includes('(无变化)');
-    const isIllegal = illegalRows.includes(index);
-    const isDuplicate = previewNames.indexOf(previewNames[index]) !== index;
-    const row = document.createElement("tr");
+    const previewName = previewNames[index];
+    const hasChange = previewName !== fileInfo.name;
+    const isDuplicate = nameSet.has(previewName);
+    nameSet.add(previewName);
     let warn = '';
-    if (isIllegal) warn = '<span style="color:#c00;font-size:0.9em;">(非法字符)</span>';
+    let isIllegal = false;
+    // 冲突检测
     if (isDuplicate) warn = '<span style="color:#c00;font-size:0.9em;">(重名冲突)</span>';
+    // 权限检测
+    let permIcon = '';
+    if (fileInfo.writable === false) {
+      warn += ' <span title="无写权限，跳过" style="color:#e87b00;font-size:1.1em;vertical-align:middle;">🔒</span>';
+    }
+    // 行内容
+    let row = document.createElement('tr');
     row.innerHTML = `
       <th scope="row">${index + 1}</th>
       <td>${fileInfo.name}</td>
       <td class="preview-cell ${hasChange ? "preview-highlight" : "dimmed"}" style="font-family:monospace;">
-        ${previewHTML} ${warn}
+        ${previewName} ${warn}
       </td>
     `;
-    if (isIllegal || isDuplicate) row.style.background = '#ffeaea';
+    if (isIllegal || isDuplicate || fileInfo.writable === false) row.style.background = '#ffeaea';
+    row.className = fileInfo.writable === false ? 'file-row-readonly' : '';
     fileTable.appendChild(row);
   });
   // 冲突时禁用按钮
@@ -518,24 +567,48 @@ function getPreviewForSequence(fileName, withHighlight = false) {
 
 // 按钮事件相关
 function setupButtonEvents() {
+  // 按钮状态更新函数
+  window.updateUndoRedoButtons = function() {
+    const undoRenameButton = document.getElementById("undo-rename");
+    const redoRenameButton = document.getElementById("redo-rename");
+    if (undoRenameButton) undoRenameButton.disabled = undoStack.length === 0;
+    if (redoRenameButton) redoRenameButton.disabled = redoStack.length === 0;
+  };
+
   // 撤销按钮事件
   if (undoRenameButton) {
     undoRenameButton.addEventListener("click", async () => {
-      if (!lastRenameUndoInfo) return;
       try {
-        const result = await invoke("undo_rename", lastRenameUndoInfo);
+        const result = await invoke("undo_rename");
         if (result.success) {
-          alert("已撤销上一次重命名");
-          undoRenameButton.disabled = true;
-          lastRenameUndoInfo = null;
+          showErrorMsg("已撤销上一步重命名", true);
+          // 这里可选择刷新文件列表，或提示用户手动刷新
         } else {
-          alert(result.error_message || "撤销失败");
+          showErrorMsg(result.error_message || "撤销失败");
         }
       } catch (error) {
-        alert("撤销操作发生错误: " + error.message);
+        showErrorMsg("撤销操作发生错误: " + error.message);
       }
     });
   }
+  // 重做按钮事件
+  const redoRenameButton = document.getElementById("redo-rename");
+  if (redoRenameButton) {
+    redoRenameButton.addEventListener("click", async () => {
+      try {
+        const result = await invoke("redo_rename");
+        if (result.success) {
+          showErrorMsg("已重做重命名", true);
+          // 这里可选择刷新文件列表，或提示用户手动刷新
+        } else {
+          showErrorMsg(result.error_message || "重做失败");
+        }
+      } catch (error) {
+        showErrorMsg("重做操作发生错误: " + error.message);
+      }
+    });
+  }
+
 
   // 清空按钮
   clearAllButton.addEventListener("click", () => {
@@ -608,22 +681,40 @@ function setupButtonEvents() {
 
 // 调用 Tauri 后端执行重命名
 async function executeRename(filePaths, activeTabId, ruleData) {
+  // 操作前快照入undo栈，清空redo栈
+  if (loadedFiles.length > 0) {
+    undoStack.push(loadedFiles.map(f => ({...f})));
+    redoStack = [];
+    updateUndoRedoButtons();
+    saveHistory();
+  }
   if (filePaths.length === 0) {
-    alert("请先选择文件");
+    showErrorMsg("请先选择文件");
     return;
   }
 
-    // 校验规则
+  // 校验规则
   if (activeTabId === "replace" && !ruleData.find) {
-    alert("请输入要查找的内容");
+    showErrorMsg("请输入要查找的内容");
     return;
   }
   if (activeTabId === "sequence" && (!ruleData.start || !ruleData.digits)) {
-    alert("请填写序列号起始和位数");
+    showErrorMsg("请填写序列号起始和位数");
     return;
   }
   if (activeTabId === "case" && !ruleData.caseType) {
-    alert("请选择大小写转换类型");
+    showErrorMsg("请选择大小写转换类型");
+    return;
+  }
+
+  // 跳过无写权限文件
+  const filesToRename = loadedFiles.filter(f => filePaths.includes(f.path) && f.writable !== false);
+  const skippedFiles = loadedFiles.filter(f => filePaths.includes(f.path) && f.writable === false);
+  if (skippedFiles.length > 0) {
+    showErrorMsg(`${skippedFiles.length} 个文件因无写权限被跳过`, false);
+  }
+  if (filesToRename.length === 0) {
+    showErrorMsg("所选文件均无写权限，无法重命名");
     return;
   }
   try {
@@ -654,7 +745,7 @@ async function executeRename(filePaths, activeTabId, ruleData) {
     console.log("重命名结果:", result);
     if (result.success) {
       if (result.renamed_count > 0) {
-        alert(`成功重命名 ${result.renamed_count} 个文件`);
+        showErrorMsg(`成功重命名 ${result.renamed_count} 个文件`, true);
         // 保存撤销信息
         if (Array.isArray(result.undo_info)) {
           lastRenameUndoInfo = { undo_map: result.undo_info };
@@ -667,13 +758,13 @@ async function executeRename(filePaths, activeTabId, ruleData) {
         clearTable();
         updateFileCount();
       } else {
-        alert(result.error_message || "没有文件需要重命名");
+        showErrorMsg(result.error_message || "没有文件需要重命名");
       }
     } else {
-      alert(`重命名失败: ${result.error_message || "未知错误"}`);
+      showErrorMsg(`重命名失败: ${result.error_message || "未知错误"}`);
     }
   } catch (error) {
     console.error("调用后端失败:", error);
-    alert("执行重命名时发生错误: " + error.message);
+    showErrorMsg("执行重命名时发生错误: " + error.message);
   }
 }
