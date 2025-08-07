@@ -331,24 +331,36 @@ function updatePreview() {
   });
 }
 
-function getPreviewName(fileName) {
+function getPreviewName(fileName, withHighlight = false) {
   const activeTab = document.querySelector(".tab-content.active");
   if (!activeTab) return fileName;
   const tabId = activeTab.id;
   switch (tabId) {
     case "tab-replace":
-      return getPreviewForReplace(fileName);
+      return getPreviewForReplace(fileName, withHighlight);
     case "tab-sequence":
-      return getPreviewForSequence(fileName);
+      return getPreviewForSequence(fileName, withHighlight);
     case "tab-case": {
-      // 判断哪个大小写按钮激活
       const activeCaseBtn = document.querySelector("#tab-case button.active");
       if (!activeCaseBtn) return fileName;
       const text = activeCaseBtn.textContent;
-      if (text.includes("小写")) return fileName.toLowerCase();
-      if (text.includes("大写")) return fileName.toUpperCase();
-      if (text.includes("首字母")) return fileName.replace(/(^|[^a-zA-Z])([a-z])/g, (m, pre, char) => pre + char.toUpperCase());
-      return fileName;
+      let newName = fileName;
+      if (text.includes("小写")) newName = fileName.toLowerCase();
+      else if (text.includes("大写")) newName = fileName.toUpperCase();
+      else if (text.includes("首字母")) newName = fileName.replace(/(^|[^a-zA-Z])([a-z])/g, (m, pre, char) => pre + char.toUpperCase());
+      if (withHighlight && newName !== fileName) {
+        // 高亮变化部分
+        let html = '';
+        for (let i = 0; i < newName.length; i++) {
+          if (fileName[i] !== newName[i]) {
+            html += `<span class='highlight'>${newName[i] || ''}</span>`;
+          } else {
+            html += newName[i] || '';
+          }
+        }
+        return html;
+      }
+      return newName;
     }
     default:
       return fileName;
@@ -364,23 +376,22 @@ function getPreviewForReplace(fileName) {
   return fileName.replace(new RegExp(findText, "g"), replaceText);
 }
 
-function getPreviewForSequence(fileName) {
+function getPreviewForSequence(fileName, withHighlight = false) {
   const start = parseInt(startInput.value) || 1;
   const digits = parseInt(digitsInput.value) || 2;
   const position = document.querySelector('input[name="position"]:checked').value;
-
   const sequenceNumber = start.toString().padStart(digits, "0");
-  const fileExtension = fileName.includes(".")
-    ? "." + fileName.split(".").pop()
-    : "";
-  const fileNameWithoutExt = fileName.includes(".")
-    ? fileName.substring(0, fileName.lastIndexOf("."))
-    : fileName;
-
+  const fileExtension = fileName.includes(".") ? "." + fileName.split(".").pop() : "";
+  const fileNameWithoutExt = fileName.includes(".") ? fileName.substring(0, fileName.lastIndexOf(".")) : fileName;
+  let newName = position === "prefix"
+    ? `${sequenceNumber}_${fileName}`
+    : `${fileNameWithoutExt}_${sequenceNumber}${fileExtension}`;
+  if (!withHighlight || newName === fileName) return newName;
+  // 高亮序列号部分
   if (position === "prefix") {
-    return `${sequenceNumber}_${fileName}`;
+    return `<span class='highlight'>${sequenceNumber}_</span>${fileName}`;
   } else {
-    return `${fileNameWithoutExt}_${sequenceNumber}${fileExtension}`;
+    return `${fileNameWithoutExt}_<span class='highlight'>${sequenceNumber}</span>${fileExtension}`;
   }
 }
 
