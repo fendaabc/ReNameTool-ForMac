@@ -89,9 +89,13 @@ aside {
 
     <main>
       <section style="display: flex; flex-direction: column; height:100%;">
-        <div id="drop-zone" style="flex: none; min-height: 70px; margin-bottom: 0.5rem; display:flex; flex-direction:column; align-items:center; justify-content:center;">
-  <button id="select-files-btn" class="outline" style="margin-bottom:0.5rem;">选择文件</button>
-  <span style="font-size:0.92em;color:var(--pico-secondary);">将文件拖拽至此区域或点击“选择文件”</span>
+        <div id="drop-zone" style="flex: none; min-height: 70px; margin-bottom: 0.5rem; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:0.5rem;">
+  <div style="display:flex;gap:0.5rem;">
+    <button id="select-files-btn" class="outline">选择文件</button>
+    <button id="select-folder-btn" class="outline">选择文件夹</button>
+  </div>
+  <span style="font-size:0.92em;color:var(--pico-secondary);">将文件或文件夹拖拽至此区域，或点击上方按钮</span>
+  <span style="font-size:0.88em;color:#a0a0a0;">仅支持常见图片、文档、视频等类型，其他类型将自动过滤</span>
 </div>
         <div style="flex: 1; display: flex; flex-direction: column;">
           <div class="overflow-auto" style="flex: 1; min-height: 100px;">
@@ -106,7 +110,11 @@ aside {
         <th scope="col">新文件名 (预览)</th>
       </tr>
     </thead>
-    <tbody></tbody>
+    <tbody id="file-table-body">
+  <tr id="empty-tip-row">
+    <td colspan="3" style="text-align:center;color:var(--pico-secondary);padding:2.5em 0;font-size:1.05em;">暂无文件，请拖拽或选择文件/文件夹导入</td>
+  </tr>
+</tbody>
   </table>
 </div>
         </div>

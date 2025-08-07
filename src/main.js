@@ -220,31 +220,33 @@ async function setupTauriDragDrop() {
 async function handleFilePathsWithFolders(paths) {
   try {
     console.log("处理路径（可能包含文件夹）:", paths);
-
     // 调用 Rust 后端来展开文件夹中的文件
-    const allFilePaths = await invoke("get_files_from_paths", {
-      paths: paths,
-    });
-
+    const allFilePaths = await invoke("get_files_from_paths", { paths });
     console.log("展开后的所有文件:", allFilePaths);
-
+    // 支持的扩展名（常见图片/文档/视频/压缩包等）
+    const allowedExts = [
+      'jpg','jpeg','png','gif','bmp','webp','svg','heic','tiff',
+      'pdf','doc','docx','xls','xlsx','ppt','pptx','txt','md','csv',
+      'mp4','mov','avi','mkv','webm','mp3','wav','aac','flac','zip','rar','7z','tar','gz'
+    ];
     // 清空现有文件和表格
     loadedFiles = [];
     clearTable();
-
-    // 处理所有文件路径
+    // 过滤并收集支持的文件
     allFilePaths.forEach((filePath) => {
       const fileName = filePath.split("/").pop() || filePath.split("\\").pop();
-      loadedFiles.push({
-        name: fileName,
-        path: filePath, // 真实的文件路径
-      });
+      const ext = fileName.includes('.') ? fileName.split('.').pop().toLowerCase() : '';
+      if (allowedExts.includes(ext)) {
+        loadedFiles.push({ name: fileName, path: filePath });
+      }
     });
-
     // 更新显示
     updateFileTable();
     updateFileCount();
     updatePreview();
+    // 空状态提示行显示/隐藏
+    const emptyRow = document.getElementById('empty-tip-row');
+    if (emptyRow) emptyRow.style.display = loadedFiles.length === 0 ? '' : 'none';
   } catch (error) {
     console.error("处理文件路径失败:", error);
     alert("处理文件路径失败: " + error.message);
@@ -252,21 +254,6 @@ async function handleFilePathsWithFolders(paths) {
 }
 
 function clearTable() {
-  fileTable.innerHTML = "";
-}
-
-function updateFileTable() {
-  clearTable();
-
-  loadedFiles.forEach((fileInfo, index) => {
-    const previewName = getPreviewName(fileInfo.name);
-    const hasChange = previewName !== fileInfo.name;
-
-    const row = document.createElement("tr");
-    row.innerHTML = `
-            <th scope="row">${index + 1}</th>
-            <td>${fileInfo.name}</td>
-            <td class="preview-cell ${hasChange ? "preview-highlight" : "dimmed"}">
                 ${hasChange ? previewName : "(无变化)"}
             </td>
         `;
