@@ -326,21 +326,16 @@ button {
   color: #1373a9 !important;
   font-weight: 500 !important;
   border: none !important;
-  font-size: 1.08em !important;
-  border-radius: 1.5em 1.5em 0 0 !important;
-  transition: 
-    background 0.2s, 
-    color 0.2s, 
-    box-shadow 0.2s, 
-    transform 0.15s, 
-    font-size 0.15s !important;
-  opacity: 0.7 !important;
+  font-size: 1em !important;
+  border-radius: 12px 12px 0 0 !important;
+  transition: background 0.2s, color 0.2s, box-shadow 0.2s, transform 0.15s, font-size 0.15s !important;
+  opacity: 0.85 !important;
   box-shadow: none !important;
   position: relative !important;
   z-index: 1 !important;
-  padding: 1.5em 1.5em !important;
-  min-width: 180px !important;
-  min-height: 100px !important;
+  padding: 0.58em 1.15em !important;
+  min-width: 74px !important;
+  min-height: 36px !important;
   display: flex !important;
   align-items: center !important;
   justify-content: center !important;
@@ -380,19 +375,7 @@ button {
   transform: scale(1.09) translateY(-4px);
   z-index: 2;
 }
-.tab-link.active::after {
-  content: '';
-  display: block;
-  position: absolute;
-  left: 8%;
-  right: 8%;
-  bottom: -12px;
-  height: 10px;
-  border-radius: 7px;
-  background: linear-gradient(90deg, #0e8cfb 0%, #00e0ff 30%, #00ffb8 70%, #ffb300 100%);
-  box-shadow: 0 2px 18px #00e0ff99, 0 0 16px #ffb30066;
-  z-index: 3;
-}
+/* 移除tab选中下方渐变，保持极简 */
 
 button:hover {
   border-color: #396cd8;
