@@ -261,6 +261,59 @@ function clearTable() {
   });
 }
 
+function updateFileTable() {
+  clearTable();
+  const emptyRow = document.getElementById('empty-tip-row');
+  const applyRenameButton = document.getElementById('apply-rename');
+  if (loadedFiles.length === 0) {
+    if (emptyRow) emptyRow.style.display = '';
+    if (applyRenameButton) applyRenameButton.disabled = true;
+    return;
+  }
+  if (emptyRow) emptyRow.style.display = 'none';
+  // 生成所有新文件名
+  const previewNames = loadedFiles.map(f => getPreviewName(f.name));
+  // 检查冲突和非法字符
+  const nameSet = new Set();
+  let hasConflict = false;
+  let illegalRows = [];
+  previewNames.forEach((name, idx) => {
+    // 检查非法字符
+    if (/[\\/:*?"<>|]/.test(name)) {
+      illegalRows.push(idx);
+      hasConflict = true;
+    }
+    // 检查重名
+    if (nameSet.has(name)) {
+      hasConflict = true;
+    } else {
+      nameSet.add(name);
+    }
+  });
+  // 渲染表格
+  loadedFiles.forEach((fileInfo, index) => {
+    const previewHTML = getPreviewName(fileInfo.name, true);
+    const hasChange = previewHTML && !previewHTML.includes('(无变化)');
+    const isIllegal = illegalRows.includes(index);
+    const isDuplicate = previewNames.indexOf(previewNames[index]) !== index;
+    const row = document.createElement("tr");
+    let warn = '';
+    if (isIllegal) warn = '<span style="color:#c00;font-size:0.9em;">(非法字符)</span>';
+    if (isDuplicate) warn = '<span style="color:#c00;font-size:0.9em;">(重名冲突)</span>';
+    row.innerHTML = `
+      <th scope="row">${index + 1}</th>
+      <td>${fileInfo.name}</td>
+      <td class="preview-cell ${hasChange ? "preview-highlight" : "dimmed"}" style="font-family:monospace;">
+        ${previewHTML} ${warn}
+      </td>
+    `;
+    if (isIllegal || isDuplicate) row.style.background = '#ffeaea';
+    fileTable.appendChild(row);
+  });
+  // 冲突时禁用按钮
+  if (applyRenameButton) applyRenameButton.disabled = hasConflict;
+}
+
 function updateFileCount() {
   fileCountElement.textContent = `已加载 ${loadedFiles.length} 个文件`;
 }
