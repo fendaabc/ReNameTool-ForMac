@@ -25,6 +25,59 @@ main, section, aside, .tab-group, .tab-content, table, thead, tbody, tr, td, th,
   color: var(--fg) !important;
   border-color: var(--border) !important;
 }
+/* 强制亮色下所有panel区块为白色，避免暗色残留 */
+html[data-theme="light"] main,
+html[data-theme="light"] section,
+html[data-theme="light"] aside,
+html[data-theme="light"] .tab-group,
+html[data-theme="light"] .tab-content,
+html[data-theme="light"] table,
+html[data-theme="light"] thead,
+html[data-theme="light"] tbody,
+html[data-theme="light"] tr,
+html[data-theme="light"] td,
+html[data-theme="light"] th,
+html[data-theme="light"] input,
+html[data-theme="light"] textarea,
+html[data-theme="light"] select,
+html[data-theme="light"] button {
+  background: #fff !important;
+}
+html[data-theme="purelight"] main,
+html[data-theme="purelight"] section,
+html[data-theme="purelight"] aside,
+html[data-theme="purelight"] .tab-group,
+html[data-theme="purelight"] .tab-content,
+html[data-theme="purelight"] table,
+html[data-theme="purelight"] thead,
+html[data-theme="purelight"] tbody,
+html[data-theme="purelight"] tr,
+html[data-theme="purelight"] td,
+html[data-theme="purelight"] th,
+html[data-theme="purelight"] input,
+html[data-theme="purelight"] textarea,
+html[data-theme="purelight"] select,
+html[data-theme="purelight"] button {
+  background: #fff !important;
+}
+html[data-theme="dark"] main,
+html[data-theme="dark"] section,
+html[data-theme="dark"] aside,
+html[data-theme="dark"] .tab-group,
+html[data-theme="dark"] .tab-content,
+html[data-theme="dark"] table,
+html[data-theme="dark"] thead,
+html[data-theme="dark"] tbody,
+html[data-theme="dark"] tr,
+html[data-theme="dark"] td,
+html[data-theme="dark"] th,
+html[data-theme="dark"] input,
+html[data-theme="dark"] textarea,
+html[data-theme="dark"] select,
+html[data-theme="dark"] button {
+  background: #23272e !important;
+}
+
 
 input, textarea, select {
   background: #fff !important;
@@ -110,17 +163,21 @@ html[data-theme="dark"] .tab-link:not(.active):hover {
 
 /* 主题切换按钮样式 */
 #theme-toggle {
-  background: rgba(220,220,220,0.72) !important;
+  background: #f6f6f6 !important;
   border-radius: 50% !important;
-  border: 1.5px solid #e0e0e0 !important;
+  border: 1.5px solid #0e8cfb !important;
   box-shadow: 0 1px 8px 0 rgba(80,80,80,0.07);
   width: 36px; height: 36px;
   display: flex; align-items: center; justify-content: center;
   transition: border 0.2s, background 0.2s;
 }
+html[data-theme="purelight"] #theme-toggle {
+  background: #fff !important;
+  border: 1.5px solid #0e8cfb !important;
+}
 #theme-toggle:hover {
   border: 1.5px solid #0e8cfb !important;
-  background: rgba(14,140,251,0.10) !important;
+  background: #e4f0fa !important;
 }
 #theme-toggle svg {
   width: 24px; height: 24px;
