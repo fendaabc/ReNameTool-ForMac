@@ -495,12 +495,18 @@ function setupButtonEvents() {
             .value,
         };
         break;
-      case "case":
-        ruleData = {
-          // 大小写转换的具体规则需要根据点击的按钮确定
-          // 这里暂时留空，实际使用时需要记录用户点击了哪个按钮
-        };
+      case "case": {
+        // 记录大小写规则类型
+        const activeCaseBtn = document.querySelector("#tab-case button.active");
+        let caseType = "";
+        if (activeCaseBtn) {
+          if (activeCaseBtn.textContent.includes("小写")) caseType = "lower";
+          else if (activeCaseBtn.textContent.includes("大写")) caseType = "upper";
+          else if (activeCaseBtn.textContent.includes("首字母")) caseType = "capitalize";
+        }
+        ruleData = { caseType };
         break;
+      }
     }
 
     // 打印收集到的数据
@@ -520,37 +526,48 @@ async function executeRename(filePaths, activeTabId, ruleData) {
     return;
   }
 
-  // 目前只支持查找替换功能
-  if (activeTabId !== "replace") {
-    alert("目前只支持查找替换功能，其他功能正在开发中");
-    return;
-  }
-
-  // 检查查找替换规则
-  if (!ruleData.find) {
+    // 校验规则
+  if (activeTabId === "replace" && !ruleData.find) {
     alert("请输入要查找的内容");
     return;
   }
-
+  if (activeTabId === "sequence" && (!ruleData.start || !ruleData.digits)) {
+    alert("请填写序列号起始和位数");
+    return;
+  }
+  if (activeTabId === "case" && !ruleData.caseType) {
+    alert("请选择大小写转换类型");
+    return;
+  }
   try {
-    console.log("准备调用 Tauri 后端，文件路径:", filePaths);
-    console.log("使用规则:", ruleData);
-
-    // 调用 Rust 后端 - 传递文件路径和规则
-    const result = await invoke("execute_rename", {
-      filePaths: filePaths,
-      rule: {
+    let backendRule = {};
+    if (activeTabId === "replace") {
+      backendRule = {
+        type: "replace",
         find: ruleData.find,
         replace: ruleData.replace || "",
-      },
+      };
+    } else if (activeTabId === "sequence") {
+      backendRule = {
+        type: "sequence",
+        start: ruleData.start,
+        digits: ruleData.digits,
+        position: ruleData.position,
+      };
+    } else if (activeTabId === "case") {
+      backendRule = {
+        type: "case",
+        caseType: ruleData.caseType, // "upper" | "lower" | "capitalize"
+      };
+    }
+    const result = await invoke("execute_rename", {
+      filePaths: filePaths,
+      rule: backendRule,
     });
-
     console.log("重命名结果:", result);
-
     if (result.success) {
       if (result.renamed_count > 0) {
         alert(`成功重命名 ${result.renamed_count} 个文件`);
-        // 重命名成功后清空文件列表
         loadedFiles = [];
         clearTable();
         updateFileCount();

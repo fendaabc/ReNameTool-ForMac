@@ -30,9 +30,14 @@ struct ExecuteRenameResult {
 }
 
 #[derive(Serialize, Deserialize)]
-struct ReplaceRule {
-    find: String,
-    replace: String,
+#[serde(tag = "type")]
+pub enum RenameRule {
+    #[serde(rename = "replace")]
+    Replace { find: String, replace: String },
+    #[serde(rename = "sequence")]
+    Sequence { start: usize, digits: usize, position: String },
+    #[serde(rename = "case")]
+    Case { caseType: String },
 }
 
 #[tauri::command]
@@ -127,7 +132,7 @@ async fn rename_files(operations: Vec<RenameOperation>) -> Result<RenameResult, 
 }
 
 #[tauri::command]
-async fn execute_rename(file_paths: Vec<String>, rule: ReplaceRule) -> Result<ExecuteRenameResult, String> {
+async fn execute_rename(file_paths: Vec<String>, rule: RenameRule) -> Result<ExecuteRenameResult, String> {
     if file_paths.is_empty() {
         return Ok(ExecuteRenameResult {
             success: false,
@@ -155,32 +160,78 @@ async fn execute_rename(file_paths: Vec<String>, rule: ReplaceRule) -> Result<Ex
         }
     }
 
-    // 第二步：生成新文件名并处理重复
+    // 生成新文件名并处理重复
     let mut rename_map: Vec<(PathBuf, PathBuf)> = Vec::new();
     let mut new_name_counts: HashMap<String, usize> = HashMap::new();
 
-    for file_path in &file_paths {
-        let old_path = PathBuf::from(file_path);
-        let parent_dir = old_path.parent().unwrap_or(Path::new("."));
-        
-        // 获取文件名和扩展名
-        let file_name = old_path.file_name()
-            .and_then(|name| name.to_str())
-            .unwrap_or("");
-        
-        // 执行用户指定的替换规则
-        let new_base_name = file_name.replace(&rule.find, &rule.replace);
-        
-        // 如果没有发生替换，跳过这个文件
-        if new_base_name == file_name {
-            continue;
+    match rule {
+        RenameRule::Replace { find, replace } => {
+            for file_path in &file_paths {
+                let old_path = PathBuf::from(file_path);
+                let parent_dir = old_path.parent().unwrap_or(Path::new("."));
+                let file_name = old_path.file_name().and_then(|n| n.to_str()).unwrap_or("");
+                let new_base_name = file_name.replace(&find, &replace);
+                if new_base_name == file_name {
+                    continue;
+                }
+                let final_new_name = resolve_duplicate_name(&new_base_name, &mut new_name_counts);
+                let new_path = parent_dir.join(&final_new_name);
+                rename_map.push((old_path, new_path));
+            }
         }
-
-        // 处理重复文件名
-        let final_new_name = resolve_duplicate_name(&new_base_name, &mut new_name_counts);
-        let new_path = parent_dir.join(&final_new_name);
-        
-        rename_map.push((old_path, new_path));
+        RenameRule::Sequence { start, digits, position } => {
+            let mut seq = start;
+            for file_path in &file_paths {
+                let old_path = PathBuf::from(file_path);
+                let parent_dir = old_path.parent().unwrap_or(Path::new("."));
+                let file_name = old_path.file_name().and_then(|n| n.to_str()).unwrap_or("");
+                let (name, ext) = if let Some(dot) = file_name.rfind('.') {
+                    (&file_name[..dot], &file_name[dot..])
+                } else {
+                    (file_name, "")
+                };
+                let seq_str = format!("{:0width$}", seq, width = digits);
+                let new_base_name = match position.as_str() {
+                    "prefix" => format!("{}{}{}", seq_str, name, ext),
+                    "suffix" => format!("{}{}{}", name, seq_str, ext),
+                    _ => format!("{}{}{}", name, seq_str, ext),
+                };
+                let final_new_name = resolve_duplicate_name(&new_base_name, &mut new_name_counts);
+                let new_path = parent_dir.join(&final_new_name);
+                rename_map.push((old_path, new_path));
+                seq += 1;
+            }
+        }
+        RenameRule::Case { caseType } => {
+            for file_path in &file_paths {
+                let old_path = PathBuf::from(file_path);
+                let parent_dir = old_path.parent().unwrap_or(Path::new("."));
+                let file_name = old_path.file_name().and_then(|n| n.to_str()).unwrap_or("");
+                let (name, ext) = if let Some(dot) = file_name.rfind('.') {
+                    (&file_name[..dot], &file_name[dot..])
+                } else {
+                    (file_name, "")
+                };
+                let new_base_name = match caseType.as_str() {
+                    "upper" => format!("{}{}", name.to_uppercase(), ext),
+                    "lower" => format!("{}{}", name.to_lowercase(), ext),
+                    "capitalize" => {
+                        let mut c = name.chars();
+                        match c.next() {
+                            None => String::new(),
+                            Some(f) => format!("{}{}{}", f.to_uppercase(), c.as_str().to_lowercase(), ext),
+                        }
+                    }
+                    _ => format!("{}{}", name, ext),
+                };
+                if new_base_name == file_name {
+                    continue;
+                }
+                let final_new_name = resolve_duplicate_name(&new_base_name, &mut new_name_counts);
+                let new_path = parent_dir.join(&final_new_name);
+                rename_map.push((old_path, new_path));
+            }
+        }
     }
 
     if rename_map.is_empty() {
