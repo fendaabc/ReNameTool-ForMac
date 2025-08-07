@@ -1,0 +1,41 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>拖拽测试</title>
+</head>
+<body>
+    <h1>拖拽测试页面</h1>
+    <div id="drop-area" style="width: 300px; height: 200px; border: 2px dashed #ccc; padding: 20px; text-align: center;">
+        拖拽文件到这里
+    </div>
+    
+    <script>
+        console.log("测试页面 JavaScript 已加载");
+        alert("测试页面已加载");
+        
+        document.addEventListener('DOMContentLoaded', function() {
+            const dropArea = document.getElementById('drop-area');
+            
+            dropArea.addEventListener('dragover', function(e) {
+                e.preventDefault();
+                console.log('拖拽悬停');
+                dropArea.style.backgroundColor = '#f0f0f0';
+            });
+            
+            dropArea.addEventListener('dragleave', function(e) {
+                console.log('拖拽离开');
+                dropArea.style.backgroundColor = '';
+            });
+            
+            dropArea.addEventListener('drop', function(e) {
+                e.preventDefault();
+                console.log('文件拖拽', e);
+                alert('检测到文件拖拽！');
+                dropArea.style.backgroundColor = '';
+            });
+            
+            console.log('拖拽监听器已设置');
+        });
+    </script>
+</body>
+</html>

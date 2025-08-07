@@ -1,0 +1,571 @@
+<!DOCTYPE html>
+<html lang="zh-CN" data-theme="light">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>文件批量重命名 - 拖拽测试</title>
+    <link
+      rel="stylesheet"
+      href="https://cdn.jsdelivr.net/npm/@picocss/pico@2/css/pico.min.css"
+    />
+    <style>
+      body {
+        padding: 2rem;
+      }
+      #drop-zone {
+        border: 2px dashed var(--pico-primary);
+        padding: 3rem;
+        text-align: center;
+        margin-bottom: 2rem;
+        cursor: pointer;
+        transition: background-color 0.2s;
+      }
+      #drop-zone:hover {
+        background-color: rgba(var(--pico-primary-rgb), 0.1);
+      }
+
+      #drop-zone button:hover {
+        background-color: rgba(var(--pico-primary-rgb), 0.15);
+        border-color: var(--pico-primary);
+      }
+      .preview-highlight {
+        color: var(--pico-primary);
+        font-weight: bold;
+      }
+      .dimmed {
+        color: var(--pico-secondary);
+      }
+      main {
+        display: grid;
+        grid-template-columns: 2fr 1fr;
+        grid-gap: 2rem;
+      }
+      .tab-content {
+        display: none;
+      }
+      .tab-content.active {
+        display: block;
+      }
+    </style>
+  </head>
+  <body>
+    <header>
+      <div id="drop-zone">
+        <hgroup>
+          <h2>文件批量重命名</h2>
+          <h3>将文件拖拽至此，或点击下方按钮选择</h3>
+        </hgroup>
+        <div style="margin-top: 1rem">
+          <button id="select-files-btn" class="outline">选择文件</button>
+        </div>
+      </div>
+    </header>
+
+    <main>
+      <article>
+        <h4 id="file-count">已加载 0 个文件</h4>
+        <div class="overflow-auto">
+          <table>
+            <thead>
+              <tr>
+                <th scope="col">#</th>
+                <th scope="col">原文件名</th>
+                <th scope="col">新文件名 (预览)</th>
+              </tr>
+            </thead>
+            <tbody></tbody>
+          </table>
+        </div>
+      </article>
+
+      <aside>
+        <hgroup>
+          <h4>重命名规则</h4>
+          <h5>一次只可选择并执行一种规则</h5>
+        </hgroup>
+
+        <nav>
+          <ul>
+            <li>
+              <a href="#" class="tab-link active" data-tab="tab-replace"
+                >查找替换</a
+              >
+            </li>
+            <li>
+              <a href="#" class="tab-link" data-tab="tab-sequence">添加序列</a>
+            </li>
+            <li><a href="#" class="tab-link" data-tab="tab-case">大小写</a></li>
+          </ul>
+        </nav>
+
+        <div id="tab-replace" class="tab-content active">
+          <label for="find">查找内容</label>
+          <input type="text" id="find" name="find" placeholder="例如: IMG_" />
+          <label for="replace">替换为</label>
+          <input
+            type="text"
+            id="replace"
+            name="replace"
+            placeholder="例如: 旅行照片-"
+          />
+        </div>
+
+        <div id="tab-sequence" class="tab-content">
+          <fieldset>
+            <legend>序列号位置</legend>
+            <label for="pos-prefix">
+              <input
+                type="radio"
+                id="pos-prefix"
+                name="position"
+                value="prefix"
+                checked
+              />
+              前缀
+            </label>
+            <label for="pos-suffix">
+              <input
+                type="radio"
+                id="pos-suffix"
+                name="position"
+                value="suffix"
+              />
+              后缀
+            </label>
+          </fieldset>
+          <label for="start">起始数字</label>
+          <input type="number" id="start" name="start" value="1" />
+          <label for="digits">数字位数 (不足补0)</label>
+          <input
+            type="number"
+            id="digits"
+            name="digits"
+            value="2"
+            placeholder="例如: 2 会生成 01, 02..."
+          />
+        </div>
+
+        <div id="tab-case" class="tab-content">
+          <button class="outline">转换为 全部大写 (UPPERCASE)</button>
+          <button class="outline">转换为 全部小写 (lowercase)</button>
+          <button class="outline">转换为 首字母大写 (Capitalize)</button>
+        </div>
+
+        <hr />
+
+        <button id="apply-rename" class="contrast">执行重命名</button>
+        <button id="clear-all" class="secondary">全部清空</button>
+      </aside>
+    </main>
+
+    <script>
+      console.log("🚀 开始设置应用");
+
+      document.addEventListener("DOMContentLoaded", async function () {
+        console.log("📋 DOM 已加载");
+
+        // 检查 Tauri API
+        if (typeof window.__TAURI__ === "undefined") {
+          console.error("❌ Tauri API 不可用");
+          return;
+        }
+
+        console.log("✅ Tauri API 可用");
+
+        // 设置按钮事件
+        setupButtons();
+
+        // 尝试设置拖拽（可能不工作）
+        await setupDragDrop();
+      });
+
+      function setupButtons() {
+        const selectFilesBtn = document.getElementById("select-files-btn");
+        const applyRenameBtn = document.getElementById("apply-rename");
+        const clearAllBtn = document.getElementById("clear-all");
+
+        selectFilesBtn.addEventListener("click", async () => {
+          try {
+            const { open } = window.__TAURI__.dialog;
+            const selected = await open({
+              multiple: true,
+              directory: false,
+            });
+
+            if (selected) {
+              const files = Array.isArray(selected) ? selected : [selected];
+              console.log("选中的文件:", files);
+              displayFiles(files);
+            }
+          } catch (error) {
+            console.error("文件选择失败:", error);
+            alert("文件选择失败: " + error.message);
+          }
+        });
+
+        // 执行重命名按钮
+        applyRenameBtn.addEventListener("click", async () => {
+          await executeRename();
+        });
+
+        // 清空按钮
+        clearAllBtn.addEventListener("click", () => {
+          clearAll();
+        });
+
+        // 实时预览
+        const findInput = document.getElementById("find");
+        const replaceInput = document.getElementById("replace");
+
+        findInput.addEventListener("input", updatePreview);
+        replaceInput.addEventListener("input", updatePreview);
+      }
+
+      async function setupDragDrop() {
+        try {
+          const { listen } = window.__TAURI__.event;
+
+          // 尝试多种可能的事件名称
+          const eventNames = [
+            "tauri://file-drop",
+            "tauri://drag-drop",
+            "file-drop",
+            "drag-drop",
+          ];
+
+          for (const eventName of eventNames) {
+            try {
+              await listen(eventName, (event) => {
+                console.log(`🎉 检测到事件 ${eventName}:`, event);
+                console.log(`🎉 事件载荷:`, event.payload);
+
+                // 检查载荷的结构
+                if (event.payload) {
+                  if (Array.isArray(event.payload)) {
+                    // 如果载荷直接是数组
+                    displayFiles(event.payload);
+                  } else if (
+                    event.payload.paths &&
+                    Array.isArray(event.payload.paths)
+                  ) {
+                    // 如果载荷有 paths 属性
+                    displayFiles(event.payload.paths);
+                  } else if (typeof event.payload === "object") {
+                    // 如果载荷是对象，尝试找到文件路径
+                    console.log("🔍 载荷对象结构:", Object.keys(event.payload));
+
+                    // 尝试常见的属性名
+                    const possibleKeys = [
+                      "files",
+                      "items",
+                      "data",
+                      "filePaths",
+                    ];
+                    let found = false;
+
+                    for (const key of possibleKeys) {
+                      if (
+                        event.payload[key] &&
+                        Array.isArray(event.payload[key])
+                      ) {
+                        displayFiles(event.payload[key]);
+                        found = true;
+                        break;
+                      }
+                    }
+
+                    if (!found) {
+                      console.log(
+                        "检测到拖拽，但无法解析文件路径。载荷结构: " +
+                          Object.keys(event.payload).join(", ")
+                      );
+                    }
+                  } else {
+                    console.log("🤔 未知的载荷格式:", typeof event.payload);
+                  }
+                } else {
+                  console.log("检测到拖拽事件，但没有载荷数据");
+                }
+              });
+              console.log(`✅ 监听事件: ${eventName}`);
+            } catch (e) {
+              console.log(`❌ 无法监听事件: ${eventName}`);
+            }
+          }
+
+          // 也尝试悬停和取消事件
+          try {
+            await listen("tauri://file-drop-hover", (event) => {
+              console.log("🎯 拖拽悬停");
+              document.body.style.backgroundColor = "#f0f8ff";
+            });
+
+            await listen("tauri://file-drop-cancelled", (event) => {
+              console.log("❌ 拖拽取消");
+              document.body.style.backgroundColor = "";
+            });
+          } catch (e) {
+            console.log("❌ 无法设置悬停/取消事件");
+          }
+        } catch (error) {
+          console.error("❌ 拖拽设置失败:", error);
+        }
+      }
+
+      function displayFiles(files) {
+        const tbody = document.querySelector("tbody");
+        tbody.innerHTML = "";
+
+        files.forEach((file, index) => {
+          const fileName = file.split("/").pop() || file.split("\\\\").pop();
+          const row = document.createElement("tr");
+          row.innerHTML = `
+            <th scope="row">${index + 1}</th>
+            <td>${fileName}</td>
+            <td class="preview-highlight">准备重命名</td>
+          `;
+          tbody.appendChild(row);
+        });
+
+        document.getElementById(
+          "file-count"
+        ).textContent = `已加载 ${files.length} 个文件`;
+        console.log("📁 显示文件:", files);
+      }
+
+      // 全局变量存储当前文件列表
+      let currentFiles = [];
+
+      // 处理文件夹
+      async function handleFolders(folders) {
+        console.log("处理文件夹:", folders);
+
+        try {
+          const { invoke } = window.__TAURI__.core;
+
+          if (folders.length === 1) {
+            // 单个文件夹：展开内部文件
+            console.log("单个文件夹模式：展开内部文件");
+            const files = await invoke("get_files_from_paths", {
+              paths: folders,
+            });
+            console.log("展开的文件:", files);
+            displayFiles(files);
+          } else {
+            // 多个文件夹：重命名文件夹本身
+            console.log("多个文件夹模式：重命名文件夹本身");
+            displayFiles(folders);
+          }
+        } catch (error) {
+          console.error("处理文件夹失败:", error);
+          alert("处理文件夹失败: " + error.message);
+        }
+      }
+
+      // 智能处理选中的项目
+      async function handleSelectedItems(items) {
+        console.log("处理选中的项目:", items);
+
+        try {
+          const { invoke } = window.__TAURI__.core;
+
+          // 检查选中项目的类型
+          const itemTypes = await Promise.all(
+            items.map(async (item) => {
+              try {
+                // 调用后端检查是文件还是文件夹
+                const result = await invoke("get_files_from_paths", {
+                  paths: [item],
+                });
+                return {
+                  path: item,
+                  isDirectory:
+                    result.length > 1 ||
+                    (result.length === 1 && result[0] !== item),
+                  files: result,
+                };
+              } catch (error) {
+                console.error("检查项目类型失败:", item, error);
+                return {
+                  path: item,
+                  isDirectory: false,
+                  files: [item],
+                };
+              }
+            })
+          );
+
+          console.log("项目类型分析:", itemTypes);
+
+          // 判断处理逻辑
+          const directories = itemTypes.filter((item) => item.isDirectory);
+          const files = itemTypes.filter((item) => !item.isDirectory);
+
+          let finalFiles = [];
+
+          if (directories.length === 1 && files.length === 0) {
+            // 单个文件夹：重命名文件夹内的文件
+            console.log("单个文件夹模式：重命名文件夹内的文件");
+            finalFiles = directories[0].files;
+          } else if (directories.length > 1 && files.length === 0) {
+            // 多个文件夹：重命名文件夹本身
+            console.log("多个文件夹模式：重命名文件夹本身");
+            finalFiles = directories.map((dir) => dir.path);
+          } else if (files.length > 0 && directories.length === 0) {
+            // 只有文件：重命名文件
+            console.log("文件模式：重命名文件");
+            finalFiles = files.map((file) => file.path);
+          } else {
+            // 混合模式：文件夹展开为内部文件，文件保持原样
+            console.log("混合模式：文件夹展开，文件保持");
+            finalFiles = [];
+
+            // 添加所有文件
+            files.forEach((file) => {
+              finalFiles.push(file.path);
+            });
+
+            // 添加文件夹内的文件
+            directories.forEach((dir) => {
+              finalFiles.push(...dir.files);
+            });
+          }
+
+          console.log("最终文件列表:", finalFiles);
+          displayFiles(finalFiles);
+        } catch (error) {
+          console.error("处理选中项目失败:", error);
+          alert("处理选中项目失败: " + error.message);
+        }
+      }
+
+      // 更新 displayFiles 函数以保存文件列表
+      function displayFiles(files) {
+        currentFiles = files; // 保存到全局变量
+
+        const tbody = document.querySelector("tbody");
+        tbody.innerHTML = "";
+
+        files.forEach((file, index) => {
+          const fileName = file.split("/").pop() || file.split("\\\\").pop();
+          const previewName = getPreviewName(fileName);
+          const hasChange = previewName !== fileName;
+
+          const row = document.createElement("tr");
+          row.innerHTML = `
+            <th scope="row">${index + 1}</th>
+            <td>${fileName}</td>
+            <td class="preview-cell ${
+              hasChange ? "preview-highlight" : "dimmed"
+            }">
+                ${hasChange ? previewName : "(无变化)"}
+            </td>
+          `;
+          tbody.appendChild(row);
+        });
+
+        document.getElementById(
+          "file-count"
+        ).textContent = `已加载 ${files.length} 个文件`;
+        console.log("📁 显示文件:", files);
+      }
+
+      // 获取预览名称
+      function getPreviewName(fileName) {
+        const activeTab = document.querySelector(".tab-content.active");
+        if (!activeTab) return fileName;
+
+        const tabId = activeTab.id;
+
+        if (tabId === "tab-replace") {
+          const findText = document.getElementById("find").value;
+          const replaceText = document.getElementById("replace").value;
+
+          if (!findText) return fileName;
+
+          return fileName.replace(new RegExp(findText, "g"), replaceText);
+        }
+
+        return fileName;
+      }
+
+      // 执行重命名
+      async function executeRename() {
+        if (currentFiles.length === 0) {
+          alert("请先选择文件");
+          return;
+        }
+
+        const findText = document.getElementById("find").value;
+        const replaceText = document.getElementById("replace").value;
+
+        if (!findText) {
+          alert("请输入要查找的内容");
+          return;
+        }
+
+        try {
+          const { invoke } = window.__TAURI__.core;
+          const result = await invoke("execute_rename", {
+            filePaths: currentFiles,
+            rule: {
+              find: findText,
+              replace: replaceText || "",
+            },
+          });
+
+          console.log("重命名结果:", result);
+
+          if (result.success) {
+            if (result.renamed_count > 0) {
+              alert(`成功重命名 ${result.renamed_count} 个文件`);
+              clearAll();
+            } else {
+              alert(result.error_message || "没有文件需要重命名");
+            }
+          } else {
+            alert(`重命名失败: ${result.error_message || "未知错误"}`);
+          }
+        } catch (error) {
+          console.error("调用后端失败:", error);
+          alert("执行重命名时发生错误: " + error.message);
+        }
+      }
+
+      // 清空所有
+      function clearAll() {
+        currentFiles = [];
+        const tbody = document.querySelector("tbody");
+        tbody.innerHTML = "";
+        document.getElementById("file-count").textContent = "已加载 0 个文件";
+
+        // 清空输入框
+        document.getElementById("find").value = "";
+        document.getElementById("replace").value = "";
+      }
+
+      // 更新预览
+      function updatePreview() {
+        if (currentFiles.length === 0) return;
+
+        const previewCells = document.querySelectorAll(".preview-cell");
+
+        currentFiles.forEach((file, index) => {
+          if (index < previewCells.length) {
+            const fileName = file.split("/").pop() || file.split("\\\\").pop();
+            const previewName = getPreviewName(fileName);
+            const cell = previewCells[index];
+
+            if (previewName !== fileName) {
+              cell.textContent = previewName;
+              cell.className = "preview-cell preview-highlight";
+            } else {
+              cell.textContent = "(无变化)";
+              cell.className = "preview-cell dimmed";
+            }
+          }
+        });
+      }
+    </script>
+  </body>
+</html>
