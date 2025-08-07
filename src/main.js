@@ -280,20 +280,16 @@ function updateFileCount() {
 
 // Tab 切换相关
 function setupTabSwitching() {
-  tabLinks.forEach((link) => {
-    link.addEventListener("click", (e) => {
+  tabLinks.forEach((btn) => {
+    btn.addEventListener("click", (e) => {
       e.preventDefault();
-
       // 移除所有 active class
-      tabLinks.forEach((l) => l.classList.remove("active"));
+      tabLinks.forEach((b) => b.classList.remove("active"));
       tabContents.forEach((c) => c.classList.remove("active"));
-
-      // 添加 active class 到被点击的链接和对应的内容
-      const tabId = link.getAttribute("data-tab");
-      link.classList.add("active");
+      // 添加 active class
+      btn.classList.add("active");
+      const tabId = btn.getAttribute("data-tab");
       document.getElementById(tabId).classList.add("active");
-
-      // 更新预览
       updatePreview();
     });
   });
@@ -312,6 +308,17 @@ function setupRealTimePreview() {
   // 位置单选框
   positionRadios.forEach((radio) => {
     radio.addEventListener("change", updatePreview);
+  });
+
+  // 大小写转换按钮（实时预览）
+  const caseButtons = document.querySelectorAll("#tab-case button");
+  caseButtons.forEach((button) => {
+    button.addEventListener("click", () => {
+      // 记录激活按钮并刷新预览
+      caseButtons.forEach((b) => b.classList.remove("active"));
+      button.classList.add("active");
+      updatePreview();
+    });
   });
 }
 
@@ -340,16 +347,22 @@ function updatePreview() {
 function getPreviewName(fileName) {
   const activeTab = document.querySelector(".tab-content.active");
   if (!activeTab) return fileName;
-
   const tabId = activeTab.id;
-
   switch (tabId) {
     case "tab-replace":
       return getPreviewForReplace(fileName);
     case "tab-sequence":
       return getPreviewForSequence(fileName);
-    case "tab-case":
-      return fileName; // 大小写转换需要点击按钮，暂不实时预览
+    case "tab-case": {
+      // 判断哪个大小写按钮激活
+      const activeCaseBtn = document.querySelector("#tab-case button.active");
+      if (!activeCaseBtn) return fileName;
+      const text = activeCaseBtn.textContent;
+      if (text.includes("小写")) return fileName.toLowerCase();
+      if (text.includes("大写")) return fileName.toUpperCase();
+      if (text.includes("首字母")) return fileName.replace(/(^|[^a-zA-Z])([a-z])/g, (m, pre, char) => pre + char.toUpperCase());
+      return fileName;
+    }
     default:
       return fileName;
   }
@@ -501,14 +514,3 @@ async function executeRename(filePaths, activeTabId, ruleData) {
     alert("执行重命名时发生错误: " + error.message);
   }
 }
-
-// 大小写转换按钮事件（需要单独处理）
-document.addEventListener("DOMContentLoaded", function () {
-  const caseButtons = document.querySelectorAll("#tab-case button");
-  caseButtons.forEach((button) => {
-    button.addEventListener("click", () => {
-      // 这里可以添加大小写转换的预览逻辑
-      console.log("点击了大小写转换按钮:", button.textContent);
-    });
-  });
-});

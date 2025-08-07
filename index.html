@@ -10,13 +10,13 @@
     />
     <style>
       body {
-        padding: 2rem;
+        padding: 1rem;
       }
       #drop-zone {
         border: 2px dashed var(--pico-primary);
-        padding: 3rem;
+        padding: 2rem;
         text-align: center;
-        margin-bottom: 2rem;
+        margin-bottom: 1rem;
         cursor: pointer;
         transition: background-color 0.2s;
       }
@@ -36,10 +36,41 @@
         color: var(--pico-secondary);
       }
       main {
-        display: grid;
-        grid-template-columns: 2fr 1fr;
-        grid-gap: 2rem;
-      }
+  display: grid;
+  grid-template-columns: minmax(340px, 2.2fr) minmax(280px, 1fr);
+  gap: 1.2rem;
+  align-items: start;
+  height: 65vh;
+  min-height: 380px;
+  max-width: 1200px;
+  margin: 0 auto;
+}
+
+aside {
+  max-width: 420px;
+  width: 100%;
+}
+
+@media (max-width: 1200px) {
+  main {
+    grid-template-columns: 1.6fr 1fr;
+    gap: 0.8rem;
+  }
+  aside {
+    max-width: 100%;
+  }
+}
+
+@media (max-width: 800px) {
+  main {
+    grid-template-columns: 1fr;
+    height: auto;
+  }
+  section, aside {
+    max-width: 100%;
+    width: 100%;
+  }
+}
       .tab-content {
         display: none;
       }
@@ -49,113 +80,113 @@
     </style>
   </head>
   <body>
-    <header>
-      <div id="drop-zone">
-        <hgroup>
-          <h2>文件批量重命名</h2>
-          <h3>将文件拖拽至此，或点击下方按钮选择</h3>
-        </hgroup>
-        <div style="margin-top: 1rem">
-          <button id="select-files-btn" class="outline">选择文件</button>
-        </div>
-      </div>
-    </header>
+    <header style="padding-bottom: 0.5rem;">
+  <div style="display: flex; align-items: center; justify-content: flex-start; gap:1rem;">
+    <img src="favicon.ico" alt="logo" style="width:32px;height:32px;">
+    <h2 style="margin: 0;">文件批量重命名</h2>
+  </div>
+</header>
 
     <main>
-      <article>
-        <h4 id="file-count">已加载 0 个文件</h4>
-        <div class="overflow-auto">
-          <table>
-            <thead>
-              <tr>
-                <th scope="col">#</th>
-                <th scope="col">原文件名</th>
-                <th scope="col">新文件名 (预览)</th>
-              </tr>
-            </thead>
-            <tbody></tbody>
-          </table>
+      <section style="display: flex; flex-direction: column; height:100%;">
+        <div id="drop-zone" style="flex: none; min-height: 70px; margin-bottom: 0.5rem; display:flex; flex-direction:column; align-items:center; justify-content:center;">
+  <button id="select-files-btn" class="outline" style="margin-bottom:0.5rem;">选择文件</button>
+  <span style="font-size:0.92em;color:var(--pico-secondary);">将文件拖拽至此区域或点击“选择文件”</span>
+</div>
+        <div style="flex: 1; display: flex; flex-direction: column;">
+          <div class="overflow-auto" style="flex: 1; min-height: 100px;">
+  <table style="width:100%; font-size: 0.9em;">
+    <thead>
+      <tr>
+        <th colspan="3" id="file-count" style="text-align:left; font-size:0.92em; font-weight:normal; color:var(--pico-secondary); background:transparent;">已加载 0 个文件</th>
+      </tr>
+      <tr>
+        <th scope="col">#</th>
+        <th scope="col">原文件名</th>
+        <th scope="col">新文件名 (预览)</th>
+      </tr>
+    </thead>
+    <tbody></tbody>
+  </table>
+</div>
         </div>
-      </article>
+        
+      </section>
 
-      <aside>
-        <hgroup>
-          <h4>重命名规则</h4>
-          <h5>一次只可选择并执行一种规则</h5>
-        </hgroup>
+      <aside style="display: flex; flex-direction: column; height:100%; justify-content: space-between;">
+        <div>
+          <hgroup>
+            <h4>重命名规则</h4>
+            <h5 style="margin-bottom:0.5rem;">一次只可选择并执行一种规则</h5>
+          </hgroup>
 
-        <nav>
-          <ul>
-            <li>
-              <a href="#" class="tab-link active" data-tab="tab-replace"
-                >查找替换</a
-              >
-            </li>
-            <li>
-              <a href="#" class="tab-link" data-tab="tab-sequence">添加序列</a>
-            </li>
-            <li><a href="#" class="tab-link" data-tab="tab-case">大小写</a></li>
-          </ul>
-        </nav>
+          <nav style="margin-bottom: 1rem;">
+  <div class="tab-group" style="display:flex;gap:0.5rem;">
+    <button type="button" class="tab-link active" data-tab="tab-replace">查找替换</button>
+    <button type="button" class="tab-link" data-tab="tab-sequence">添加序列</button>
+    <button type="button" class="tab-link" data-tab="tab-case">大小写</button>
+  </div>
+</nav>
 
-        <div id="tab-replace" class="tab-content active">
-          <label for="find">查找内容</label>
-          <input type="text" id="find" name="find" placeholder="例如: IMG_" />
-          <label for="replace">替换为</label>
-          <input
-            type="text"
-            id="replace"
-            name="replace"
-            placeholder="例如: 旅行照片-"
-          />
+          <div id="tab-replace" class="tab-content active">
+            <label for="find">查找内容</label>
+            <input type="text" id="find" name="find" placeholder="例如: IMG_" />
+            <label for="replace">替换为</label>
+            <input
+              type="text"
+              id="replace"
+              name="replace"
+              placeholder="例如: 旅行照片-"
+            />
+          </div>
+
+          <div id="tab-sequence" class="tab-content">
+            <fieldset>
+              <legend>序列号位置</legend>
+              <label for="pos-prefix">
+                <input
+                  type="radio"
+                  id="pos-prefix"
+                  name="position"
+                  value="prefix"
+                  checked
+                />
+                前缀
+              </label>
+              <label for="pos-suffix">
+                <input
+                  type="radio"
+                  id="pos-suffix"
+                  name="position"
+                  value="suffix"
+                />
+                后缀
+              </label>
+            </fieldset>
+            <label for="start">起始数字</label>
+            <input type="number" id="start" name="start" value="1" />
+            <label for="digits">数字位数 (不足补0)</label>
+            <input
+              type="number"
+              id="digits"
+              name="digits"
+              value="2"
+              placeholder="例如: 2 会生成 01, 02..."
+            />
+          </div>
+
+          <div id="tab-case" class="tab-content">
+            <button class="outline">转换为 全部大写 (UPPERCASE)</button>
+            <button class="outline">转换为 全部小写 (lowercase)</button>
+            <button class="outline">转换为 首字母大写 (Capitalize)</button>
+          </div>
         </div>
-
-        <div id="tab-sequence" class="tab-content">
-          <fieldset>
-            <legend>序列号位置</legend>
-            <label for="pos-prefix">
-              <input
-                type="radio"
-                id="pos-prefix"
-                name="position"
-                value="prefix"
-                checked
-              />
-              前缀
-            </label>
-            <label for="pos-suffix">
-              <input
-                type="radio"
-                id="pos-suffix"
-                name="position"
-                value="suffix"
-              />
-              后缀
-            </label>
-          </fieldset>
-          <label for="start">起始数字</label>
-          <input type="number" id="start" name="start" value="1" />
-          <label for="digits">数字位数 (不足补0)</label>
-          <input
-            type="number"
-            id="digits"
-            name="digits"
-            value="2"
-            placeholder="例如: 2 会生成 01, 02..."
-          />
-        </div>
-
-        <div id="tab-case" class="tab-content">
-          <button class="outline">转换为 全部大写 (UPPERCASE)</button>
-          <button class="outline">转换为 全部小写 (lowercase)</button>
-          <button class="outline">转换为 首字母大写 (Capitalize)</button>
-        </div>
-
-        <hr />
-
-        <button id="apply-rename" class="contrast">执行重命名</button>
-        <button id="clear-all" class="secondary">全部清空</button>
+        <div style="display: flex; gap: 1rem; margin-top: 1rem;">
+  <button id="clear-all" class="secondary" style="flex:1;">全部清空</button>
+  <button id="apply-rename" class="contrast" style="flex:1;">执行重命名</button>
+</div>
       </aside>
+
     </main>
 
     <script>
