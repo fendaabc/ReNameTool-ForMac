@@ -28,7 +28,18 @@ main, section, aside, .tab-group, .tab-content, table, thead, tbody, tr, td, th,
 
 /* 确保右侧面板在上层，避免被左侧滚动区意外覆盖 */
 section { position: relative; z-index: 1; }
-aside { position: relative; z-index: 2; }
+aside {
+  padding-left: 1.5rem; /* 统一左侧内边距 */
+  position: relative;
+  z-index: 2;
+}
+
+aside hgroup,
+aside nav,
+aside .tab-content {
+  margin-left: 0 !important;
+  padding-left: 0 !important;
+}
 
 /* 单选样式与可点击性 */
 /* 单选样式与可点击性 - 调试增强版 */
@@ -61,10 +72,16 @@ fieldset label {
   gap: 0.55rem;
   cursor: pointer;
   user-select: none;
-  padding: 8px 12px;
+  padding: 8px 0; /* 移除左右内边距，保持垂直内边距 */
   border-radius: 6px;
   transition: background 0.2s;
   margin: 4px 0;
+}
+
+fieldset {
+  border: none; /* 移除 fieldset 边框 */
+  padding: 0; /* 移除 fieldset 内边距 */
+  margin: 0; /* 移除 fieldset 外边距 */
 }
 
 fieldset label:hover {
