@@ -4,6 +4,7 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>文件批量重命名 - 拖拽测试</title>
+    <link rel="icon" href="data:," />
     <link
       rel="stylesheet"
       href="https://cdn.jsdelivr.net/npm/@picocss/pico@2/css/pico.min.css"
@@ -202,26 +203,22 @@ aside {
           </div>
 
           <div id="tab-case" class="tab-content">
-  <div class="case-btn-row" style="display:flex;gap:0.5rem;margin-bottom:0.7rem;">
-  <button class="outline case-btn">转换为 全部大写 (UPPERCASE)</button>
-  <button class="outline case-btn">转换为 全部小写 (lowercase)</button>
-  <button class="outline case-btn">转换为 首字母大写 (Capitalize)</button>
-</div>
-<style>
-.case-btn-row {
-  display: flex;
-  flex-direction: column !important;
-  gap: 0.48rem !important;
-}
-.case-btn-row .case-btn {
-  width: 100% !important;
-  min-width: 0 !important;
-  margin: 0 !important;
-  text-align: center !important;
-}
-</style>
-  <hr style="margin:0.7rem 0 0.9rem 0;border:0;border-top:1.2px dashed #e0e8ef;">
-</div>
+            <fieldset>
+              <legend>转换规则</legend>
+              <label for="case-upper">
+                <input type="radio" id="case-upper" name="caseType" value="upper" />
+                全部大写（UPPERCASE）
+              </label>
+              <label for="case-lower">
+                <input type="radio" id="case-lower" name="caseType" value="lower" />
+                全部小写（lowercase）
+              </label>
+              <label for="case-capitalize">
+                <input type="radio" id="case-capitalize" name="caseType" value="capitalize" />
+                首字母大写（Capitalize）
+              </label>
+            </fieldset>
+          </div>
         </div>
         <div style="display: flex; gap: 1rem; margin-top: 1rem;">
   <button id="apply-rename" class="primary-action" style="flex:1;">执行重命名</button>

@@ -122,14 +122,22 @@ let startInput;
 let digitsInput;
 let positionRadios;
 
-// 初始化
-document.addEventListener("DOMContentLoaded", function () {
+// 确保DOM加载完成后执行
+document.addEventListener('DOMContentLoaded', () => {
+  initializeEventListeners();
+  
+  // 初始化主题
+  initializeTheme();
+  
   loadHistory();
-  updateUndoRedoButtons();
   console.log("=== DOM 已加载，开始初始化 ===");
   
   initializeElements();
   initializeEventListeners();
+  // 事件绑定后再刷新撤销/重做按钮状态，避免未定义错误
+  if (typeof updateUndoRedoButtons === 'function') {
+    updateUndoRedoButtons();
+  }
   
   // 添加简单的拖拽测试
   testDragDrop();
@@ -446,8 +454,13 @@ function setupTabSwitching() {
       }
       
       updatePreview();
+      console.log('Tab switched to:', tabId);
+      document.dispatchEvent(new Event('refresh-apply'));
     });
   });
+
+  // 初始化一次按钮状态
+  refreshApplyButton();
 }
 // 确保初始化时setupTabSwitching被调用
 // 已在initializeEventListeners中调用，无需重复调用
@@ -464,19 +477,24 @@ function setupRealTimePreview() {
 
   // 位置单选框
   positionRadios.forEach((radio) => {
-    radio.addEventListener("change", updatePreview);
-  });
-
-  // 大小写转换按钮（实时预览）
-  const caseButtons = document.querySelectorAll("#tab-case button");
-  caseButtons.forEach((button) => {
-    button.addEventListener("click", () => {
-      // 记录激活按钮并刷新预览
-      caseButtons.forEach((b) => b.classList.remove("active"));
-      button.classList.add("active");
+    radio.addEventListener("change", (e) => {
+      console.log('[sequence] position changed to:', e.target && e.target.value);
       updatePreview();
+      document.dispatchEvent(new Event('refresh-apply'));
     });
   });
+
+
+  // 大小写转换（改为单选组）
+  const caseRadios = document.querySelectorAll('#tab-case input[name="caseType"]');
+  caseRadios.forEach(r => {
+    r.addEventListener('change', (e) => {
+      console.log('[case] caseType changed to:', e.target && e.target.value);
+      updatePreview();
+      document.dispatchEvent(new Event('refresh-apply'));
+    });
+  });
+
 }
 
 function updatePreview() {
@@ -511,13 +529,13 @@ function getPreviewName(fileName, withHighlight = false) {
     case "tab-sequence":
       return getPreviewForSequence(fileName, withHighlight);
     case "tab-case": {
-      const activeCaseBtn = document.querySelector("#tab-case button.active");
-      if (!activeCaseBtn) return fileName;
-      const text = activeCaseBtn.textContent;
+      const checked = document.querySelector('#tab-case input[name="caseType"]:checked');
+      if (!checked) return fileName;
+      const val = checked.value; // 'upper' | 'lower' | 'capitalize'
       let newName = fileName;
-      if (text.includes("小写")) newName = fileName.toLowerCase();
-      else if (text.includes("大写")) newName = fileName.toUpperCase();
-      else if (text.includes("首字母")) newName = fileName.replace(/(^|[^a-zA-Z])([a-z])/g, (m, pre, char) => pre + char.toUpperCase());
+      if (val === 'lower') newName = fileName.toLowerCase();
+      else if (val === 'upper') newName = fileName.toUpperCase();
+      else if (val === 'capitalize') newName = fileName.replace(/(^|[^a-zA-Z])([a-z])/g, (m, pre, char) => pre + char.toUpperCase());
       if (withHighlight && newName !== fileName) {
         // 高亮变化部分
         let html = '';
@@ -567,6 +585,13 @@ function getPreviewForSequence(fileName, withHighlight = false) {
 
 // 按钮事件相关
 function setupButtonEvents() {
+  // 初始禁用状态
+  const applyBtn = document.getElementById("apply-rename");
+  const undoBtn = document.getElementById("undo-rename");
+  const redoBtn = document.getElementById("redo-rename");
+  if (applyBtn) applyBtn.disabled = true;
+  if (undoBtn) undoBtn.disabled = true;
+  if (redoBtn) redoBtn.disabled = true;
   // 按钮状态更新函数
   window.updateUndoRedoButtons = function() {
     const undoRenameButton = document.getElementById("undo-rename");
@@ -574,6 +599,30 @@ function setupButtonEvents() {
     if (undoRenameButton) undoRenameButton.disabled = undoStack.length === 0;
     if (redoRenameButton) redoRenameButton.disabled = redoStack.length === 0;
   };
+
+  // 根据规则配置与文件列表使能“执行重命名”
+  function refreshApplyButton() {
+    const applyBtnEl = document.getElementById('apply-rename');
+    const activeTab = document.querySelector('.tab-content.active');
+    const hasFiles = loadedFiles && loadedFiles.length > 0;
+    let valid = false;
+    if (activeTab && activeTab.id === 'tab-replace') {
+      valid = !!(findInput && findInput.value);
+    } else if (activeTab && activeTab.id === 'tab-sequence') {
+      valid = !!(startInput && startInput.value && digitsInput && digitsInput.value);
+    } else if (activeTab && activeTab.id === 'tab-case') {
+      valid = !!document.querySelector('#tab-case input[name="caseType"]:checked');
+    }
+    if (applyBtnEl) applyBtnEl.disabled = !(hasFiles && valid);
+  }
+
+  // 绑定输入变化以刷新按钮状态
+  [findInput, replaceInput, startInput, digitsInput].forEach(el => el && el.addEventListener('input', refreshApplyButton));
+  positionRadios && positionRadios.forEach(r => r.addEventListener('change', refreshApplyButton));
+  const caseRadiosForBtn = document.querySelectorAll('#tab-case input[name="caseType"]');
+  caseRadiosForBtn.forEach(r => r.addEventListener('change', refreshApplyButton));
+  // 允许外部触发刷新（如Tab切换）
+  document.addEventListener('refresh-apply', refreshApplyButton);
 
   // 撤销按钮事件
   if (undoRenameButton) {
@@ -656,14 +705,8 @@ function setupButtonEvents() {
         };
         break;
       case "case": {
-        // 记录大小写规则类型
-        const activeCaseBtn = document.querySelector("#tab-case button.active");
-        let caseType = "";
-        if (activeCaseBtn) {
-          if (activeCaseBtn.textContent.includes("小写")) caseType = "lower";
-          else if (activeCaseBtn.textContent.includes("大写")) caseType = "upper";
-          else if (activeCaseBtn.textContent.includes("首字母")) caseType = "capitalize";
-        }
+        const checked = document.querySelector('#tab-case input[name="caseType"]:checked');
+        const caseType = checked ? checked.value : "";
         ruleData = { caseType };
         break;
       }
