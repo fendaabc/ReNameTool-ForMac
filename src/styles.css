@@ -511,7 +511,29 @@ button {
   margin-right: 5px;
 }
 
+/* 冲突和非法字符样式 */
+.file-row-conflict,
+.file-row-invalid {
+  background-color: #ffeaea !important; /* 浅红色背景 */
+}
+
+.preview-cell.conflict,
+.preview-cell.invalid-char {
+  color: #c00 !important; /* 红色文字 */
+  font-weight: bold !important;
+}
+
 @media (prefers-color-scheme: dark) {
+  .file-row-conflict,
+  .file-row-invalid {
+    background-color: #4a2a2a !important; /* 暗色模式下的深红色背景 */
+  }
+
+  .preview-cell.conflict,
+  .preview-cell.invalid-char {
+    color: #ff8888 !important; /* 暗色模式下的亮红色文字 */
+  }
+
   :root {
     color: #f6f6f6;
     background-color: #2f2f2f;

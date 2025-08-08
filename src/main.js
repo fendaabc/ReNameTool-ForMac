@@ -402,41 +402,43 @@ function updateFileTable() {
     return;
   }
   if (emptyRow) emptyRow.style.display = 'none';
-  // 生成所有新文件名
-  const previewNames = loadedFiles.map(f => getPreviewName(f.name));
-  // 检查冲突和非法字符
-  const nameSet = new Set();
-  let hasConflict = false;
-  let illegalRows = [];
+  // 确保loadedFiles中的文件信息是最新的，包括newPath, hasConflict, invalidChar
+  // 这一步在updatePreview中已经完成，这里只需使用
+
   loadedFiles.forEach((fileInfo, index) => {
-    const previewName = previewNames[index];
-    const hasChange = previewName !== fileInfo.name;
-    const isDuplicate = nameSet.has(previewName);
-    nameSet.add(previewName);
+    const hasChange = fileInfo.newPath && fileInfo.newPath !== fileInfo.name;
     let warn = '';
-    let isIllegal = false;
-    // 冲突检测
-    if (isDuplicate) warn = '<span style="color:#c00;font-size:0.9em;">(重名冲突)</span>';
+    let rowClass = '';
+
     // 权限检测
     let permIcon = '';
     if (fileInfo.writable === false) {
       warn += ' <span title="无写权限，跳过" style="color:#e87b00;font-size:1.1em;vertical-align:middle;">🔒</span>';
+      rowClass += 'file-row-readonly ';
     }
+
+    // 冲突或非法字符警告
+    if (fileInfo.hasConflict) {
+      warn += ' <span style="color:#c00;font-size:0.9em;">(重名冲突)</span>';
+      rowClass += 'file-row-conflict ';
+    } else if (fileInfo.invalidChar) {
+      warn += ' <span style="color:#c00;font-size:0.9em;">(非法字符)</span>';
+      rowClass += 'file-row-invalid ';
+    }
+
     // 行内容
     let row = document.createElement('tr');
     row.innerHTML = `
       <th scope="row">${index + 1}</th>
       <td>${fileInfo.name}</td>
       <td class="preview-cell ${hasChange ? "preview-highlight" : "dimmed"}" style="font-family:monospace;">
-        ${previewName} ${warn}
+        ${fileInfo.newPath || '(无变化)'} ${warn}
       </td>
     `;
-    if (isIllegal || isDuplicate || fileInfo.writable === false) row.style.background = '#ffeaea';
-    row.className = fileInfo.writable === false ? 'file-row-readonly' : '';
+    row.className = rowClass.trim();
     fileTable.appendChild(row);
   });
-  // 冲突时禁用按钮
-  if (applyRenameButton) applyRenameButton.disabled = hasConflict;
+  // 按钮状态更新由 setupButtonEvents.refreshApplyButton() 统一处理
 }
 
 function updateFileCount() {
@@ -503,26 +505,79 @@ function setupRealTimePreview() {
 
 }
 
-function updatePreview() {
-  if (loadedFiles.length === 0) return;
+// 检查冲突和非法字符
+function checkForConflicts() {
+  const newPathMap = new Map();
+  let hasAnyConflict = false;
 
-  // 更新所有文件的预览
-  const previewCells = document.querySelectorAll(".preview-cell");
+  // 重置冲突和非法字符状态
+  loadedFiles.forEach(fileInfo => {
+    fileInfo.hasConflict = false;
+    fileInfo.invalidChar = false;
+  });
 
-  loadedFiles.forEach((fileInfo, index) => {
-    if (index < previewCells.length) {
-      const previewName = getPreviewName(fileInfo.name);
-      const cell = previewCells[index];
+  loadedFiles.forEach(fileInfo => {
+    if (fileInfo.newPath) {
+      // 检查非法字符 (macOS 不允许 /)
+      if (fileInfo.newPath.includes('/') || fileInfo.newPath.includes(':')) {
+        fileInfo.invalidChar = true;
+        hasAnyConflict = true;
+      }
 
-      if (previewName !== fileInfo.name) {
-        cell.textContent = previewName;
-        cell.className = "preview-cell preview-highlight";
+      // 检查重名冲突
+      const lowerCaseNewPath = fileInfo.newPath.toLowerCase(); // 忽略大小写检查冲突
+      if (newPathMap.has(lowerCaseNewPath)) {
+        // 标记当前文件和之前已经存在的文件
+        fileInfo.hasConflict = true;
+        newPathMap.get(lowerCaseNewPath).hasConflict = true;
+        hasAnyConflict = true;
       } else {
-        cell.textContent = "(无变化)";
-        cell.className = "preview-cell dimmed";
+        newPathMap.set(lowerCaseNewPath, fileInfo);
       }
     }
   });
+  return hasAnyConflict;
+}
+
+function updatePreview() {
+  if (loadedFiles.length === 0) return;
+
+  // 1. 更新所有文件的预览名称
+  loadedFiles.forEach(fileInfo => {
+    fileInfo.newPath = getPreviewName(fileInfo.name);
+  });
+
+  // 2. 检查冲突和非法字符
+  const hasConflicts = checkForConflicts();
+
+  // 3. 更新表格显示
+  const previewCells = document.querySelectorAll(".preview-cell");
+  loadedFiles.forEach((fileInfo, index) => {
+    if (index < previewCells.length) {
+      const cell = previewCells[index];
+      let className = "preview-cell";
+      let textContent = fileInfo.newPath;
+
+      if (fileInfo.hasConflict) {
+        className += " conflict";
+        textContent = "冲突! " + fileInfo.newPath; // 显示冲突提示
+      } else if (fileInfo.invalidChar) {
+        className += " invalid-char";
+        textContent = "非法字符! " + fileInfo.newPath; // 显示非法字符提示
+      } else if (fileInfo.newPath === fileInfo.name) {
+        className += " dimmed";
+        textContent = "(无变化)";
+      } else {
+        className += " preview-highlight";
+      }
+
+      cell.textContent = textContent;
+      cell.className = className;
+    }
+  });
+
+  // 4. 更新“执行重命名”按钮状态
+  setupButtonEvents.refreshApplyButton();
 }
 
 function getPreviewName(fileName, withHighlight = false) {
@@ -611,7 +666,10 @@ function setupButtonEvents() {
     } else if (activeTab && activeTab.id === 'tab-case') {
       valid = !!document.querySelector('#tab-case input[name="caseType"]:checked');
     }
-    if (applyBtnEl) applyBtnEl.disabled = !(hasFiles && valid);
+    // 检查是否有任何文件存在冲突或非法字符
+    const hasAnyConflictOrInvalidChar = loadedFiles.some(fileInfo => fileInfo.hasConflict || fileInfo.invalidChar);
+
+    if (applyBtnEl) applyBtnEl.disabled = !(hasFiles && valid && !hasAnyConflictOrInvalidChar);
   }
 
   // 绑定输入变化以刷新按钮状态
