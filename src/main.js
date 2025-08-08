@@ -133,11 +133,17 @@ document.addEventListener('DOMContentLoaded', () => {
   console.log("=== DOM 已加载，开始初始化 ===");
   
   initializeElements();
+  // 按钮状态更新函数
+  window.updateUndoRedoButtons = function() {
+    const undoRenameButton = document.getElementById("undo-rename");
+    const redoRenameButton = document.getElementById("redo-rename");
+    if (undoRenameButton) undoRenameButton.disabled = undoStack.length === 0;
+    if (redoRenameButton) redoRenameButton.disabled = redoStack.length === 0;
+  };
+
   initializeEventListeners();
-  // 事件绑定后再刷新撤销/重做按钮状态，避免未定义错误
-  if (typeof updateUndoRedoButtons === 'function') {
-    updateUndoRedoButtons();
-  }
+  // 确保在所有事件监听器设置完毕后，更新一次按钮状态
+  updateUndoRedoButtons();
   
   // 添加简单的拖拽测试
   testDragDrop();
@@ -592,14 +598,6 @@ function setupButtonEvents() {
   if (applyBtn) applyBtn.disabled = true;
   if (undoBtn) undoBtn.disabled = true;
   if (redoBtn) redoBtn.disabled = true;
-  // 按钮状态更新函数
-  window.updateUndoRedoButtons = function() {
-    const undoRenameButton = document.getElementById("undo-rename");
-    const redoRenameButton = document.getElementById("redo-rename");
-    if (undoRenameButton) undoRenameButton.disabled = undoStack.length === 0;
-    if (redoRenameButton) redoRenameButton.disabled = redoStack.length === 0;
-  };
-
   // 根据规则配置与文件列表使能“执行重命名”
   function refreshApplyButton() {
     const applyBtnEl = document.getElementById('apply-rename');
@@ -631,7 +629,15 @@ function setupButtonEvents() {
         const result = await invoke("undo_rename");
         if (result.success) {
           showErrorMsg("已撤销上一步重命名", true);
-          // 这里可选择刷新文件列表，或提示用户手动刷新
+          // 撤销成功后，需要从 undoStack 弹出，并推入 redoStack
+          if (undoStack.length > 0) {
+            redoStack.push(loadedFiles.map(f => ({...f}))); // 当前状态推入 redoStack
+            loadedFiles = undoStack.pop(); // 恢复上一个状态
+            updateFileTable();
+            updateFileCount();
+            updateUndoRedoButtons();
+            saveHistory();
+          }
         } else {
           showErrorMsg(result.error_message || "撤销失败");
         }
@@ -648,7 +654,15 @@ function setupButtonEvents() {
         const result = await invoke("redo_rename");
         if (result.success) {
           showErrorMsg("已重做重命名", true);
-          // 这里可选择刷新文件列表，或提示用户手动刷新
+          // 重做成功后，需要从 redoStack 弹出，并推入 undoStack
+          if (redoStack.length > 0) {
+            undoStack.push(loadedFiles.map(f => ({...f}))); // 当前状态推入 undoStack
+            loadedFiles = redoStack.pop(); // 恢复重做后的状态
+            updateFileTable();
+            updateFileCount();
+            updateUndoRedoButtons();
+            saveHistory();
+          }
         } else {
           showErrorMsg(result.error_message || "重做失败");
         }
@@ -674,6 +688,12 @@ function setupButtonEvents() {
 
     // 重置单选框到默认状态
     document.getElementById("pos-prefix").checked = true;
+
+    // 清空操作历史栈并更新按钮状态
+    undoStack = [];
+    redoStack = [];
+    updateUndoRedoButtons();
+    saveHistory();
   });
 
   // 执行重命名按钮
