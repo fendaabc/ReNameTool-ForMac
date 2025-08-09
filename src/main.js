@@ -91,24 +91,58 @@ console.log("=== JavaScript 文件已加载 ===");
 let loadedFiles = [];
 let lastRenameUndoInfo = null;
 let undoRenameButton = null;
-// 多步操作历史栈
+// 撤销操作历史栈
 let undoStack = [];
-let redoStack = [];
+
+// 立即暴露函数到window对象，不等待DOM加载
+window.getLoadedFiles = () => {
+  console.log("🔍 [main.js] getLoadedFiles被调用，返回:", loadedFiles);
+  return loadedFiles;
+};
+
+// 暴露设置文件列表的函数
+window.setLoadedFiles = (files) => {
+  console.log("🔧 [main.js] setLoadedFiles被调用，设置:", files);
+  loadedFiles = files.map(filePath => ({
+    name: filePath.split(/[\\/]/).pop(),
+    path: filePath,
+    readable: true,
+    writable: true,
+    newPath: filePath.split(/[\\/]/).pop(),
+    hasConflict: false,
+    invalidChar: false
+  }));
+  console.log("🔧 [main.js] loadedFiles已更新:", loadedFiles);
+};
+
+// 立即暴露所有需要的函数
+window.updatePreview = () => {
+  console.log("🔄 [window.updatePreview] 被调用");
+  if (typeof updatePreview === 'function') {
+    updatePreview();
+  } else {
+    console.warn("⚠️ [window.updatePreview] updatePreview函数还未定义");
+  }
+};
+
+// 暴露executeRename函数（需要等待函数定义后）
+setTimeout(() => {
+  window.executeRename = executeRename;
+  console.log("🔧 [main.js] executeRename函数已暴露到window对象");
+}, 0);
+
+console.log("🔧 [main.js] 函数已立即暴露");
 
 // 操作历史持久化
 function saveHistory() {
   localStorage.setItem("renameUndoStack", JSON.stringify(undoStack));
-  localStorage.setItem("renameRedoStack", JSON.stringify(redoStack));
 }
 function loadHistory() {
   try {
     const u = localStorage.getItem("renameUndoStack");
-    const r = localStorage.getItem("renameRedoStack");
     undoStack = u ? JSON.parse(u) : [];
-    redoStack = r ? JSON.parse(r) : [];
   } catch (e) {
     undoStack = [];
-    redoStack = [];
   }
 }
 
@@ -118,6 +152,19 @@ let fileTable;
 let fileCountElement;
 let clearAllButton;
 let applyRenameButton;
+
+// 安全获取DOM元素的函数
+function ensureElement(elementVar, elementId, elementName) {
+  if (!elementVar) {
+    console.warn(`⚠️ [ensureElement] ${elementName}未初始化，重新获取`);
+    const element = document.getElementById(elementId);
+    if (!element) {
+      console.error(`❌ [ensureElement] 无法找到${elementId}元素`);
+    }
+    return element;
+  }
+  return elementVar;
+}
 
 // Tab 相关元素
 let tabLinks;
@@ -142,19 +189,21 @@ document.addEventListener("DOMContentLoaded", () => {
 
   initializeElements();
   // 按钮状态更新函数
-  window.updateUndoRedoButtons = function () {
+  window.updateUndoButtons = function () {
     const undoRenameButton = document.getElementById("undo-rename");
-    const redoRenameButton = document.getElementById("redo-rename");
-    if (undoRenameButton) undoRenameButton.disabled = undoStack.length === 0;
-    if (redoRenameButton) redoRenameButton.disabled = redoStack.length === 0;
+    // 撤销按钮状态现在由重命名和撤销操作直接管理
+    // 这个函数保留用于初始化
+    if (undoRenameButton) undoRenameButton.disabled = true;
   };
 
   initializeEventListeners();
   // 确保在所有事件监听器设置完毕后，更新一次按钮状态
-  updateUndoRedoButtons();
+  updateUndoButtons();
 
   // 添加简单的拖拽测试
   testDragDrop();
+  
+  // executeRename函数已在文件开头暴露
 });
 
 // 简单的拖拽测试函数
@@ -205,12 +254,23 @@ function testDragDrop() {
 }
 
 function initializeElements() {
+  console.log("🔧 [初始化] 开始初始化DOM元素");
+  
   dropZone = document.getElementById("drop-zone");
-  fileTable = document.querySelector("tbody");
+  fileTable = document.getElementById("file-table-body");
   fileCountElement = document.getElementById("file-count");
   clearAllButton = document.getElementById("clear-all");
   applyRenameButton = document.getElementById("apply-rename");
   undoRenameButton = document.getElementById("undo-rename");
+
+  console.log("🔧 [初始化] 主要元素:", {
+    dropZone: !!dropZone,
+    fileTable: !!fileTable,
+    fileCountElement: !!fileCountElement,
+    applyRenameButton: !!applyRenameButton,
+    clearAllButton: !!clearAllButton,
+    undoRenameButton: !!undoRenameButton
+  });
 
   tabLinks = document.querySelectorAll(".tab-link");
   tabContents = document.querySelectorAll(".tab-content");
@@ -220,14 +280,37 @@ function initializeElements() {
   startInput = document.getElementById("start");
   digitsInput = document.getElementById("digits");
   positionRadios = document.querySelectorAll('input[name="position"]');
+  
+  console.log("🔧 [初始化] 输入元素:", {
+    findInput: !!findInput,
+    replaceInput: !!replaceInput,
+    startInput: !!startInput,
+    digitsInput: !!digitsInput,
+    positionRadiosCount: positionRadios.length,
+    tabLinksCount: tabLinks.length,
+    tabContentsCount: tabContents.length
+  });
+  
+  // 检查关键元素是否存在
+  const missingElements = [];
+  if (!fileTable) missingElements.push("file-table-body");
+  if (!fileCountElement) missingElements.push("file-count");
+  if (!applyRenameButton) missingElements.push("apply-rename");
+  
+  if (missingElements.length > 0) {
+    console.warn("⚠️ [初始化] 缺少关键DOM元素:", missingElements);
+    console.log("⚠️ [初始化] 这些元素将在需要时重新获取");
+  } else {
+    console.log("✅ [初始化] 所有关键DOM元素初始化成功");
+  }
 }
 
 function initializeEventListeners() {
   // 文件拖拽和选择
   setupFileHandling();
 
-  // Tab 切换
-  setupTabSwitching();
+  // Tab 切换 - 现在由HTML中的逻辑处理
+  // setupTabSwitching();
 
   // 实时预览
   setupRealTimePreview();
@@ -407,11 +490,30 @@ async function handleFilePathsWithFolders(paths) {
 }
 
 function clearTable() {
-  if (!fileTable) return;
+  if (!fileTable) {
+    console.warn("⚠️ [clearTable] fileTable未初始化，重新获取");
+    fileTable = document.getElementById("file-table-body");
+  }
+  if (!fileTable) {
+    console.error("❌ [clearTable] 无法找到file-table-body元素");
+    return;
+  }
   fileTable.innerHTML = "";
 }
 
 function updateFileTable() {
+  console.log("🔧 [updateFileTable] 开始更新文件表格");
+  
+  // 安全检查：确保fileTable存在
+  if (!fileTable) {
+    console.warn("⚠️ [updateFileTable] fileTable未初始化，重新获取");
+    fileTable = document.getElementById("file-table-body");
+    if (!fileTable) {
+      console.error("❌ [updateFileTable] 无法找到file-table-body元素");
+      return;
+    }
+  }
+  
   clearTable();
   const emptyRow = document.getElementById("empty-tip-row");
   const applyRenameButton = document.getElementById("apply-rename");
@@ -464,6 +566,14 @@ function updateFileTable() {
 }
 
 function updateFileCount() {
+  if (!fileCountElement) {
+    fileCountElement = document.getElementById("file-count");
+    if (!fileCountElement) {
+      console.error("❌ [updateFileCount] 无法找到file-count元素");
+      return;
+    }
+  }
+  
   fileCountElement.textContent = `已加载 ${loadedFiles.length} 个文件`;
 }
 
@@ -475,6 +585,7 @@ function setupTabSwitching() {
       // 移除所有 active class
       tabLinks.forEach((b) => b.classList.remove("active"));
       tabContents.forEach((c) => c.classList.remove("active"));
+      
       // 添加 active class
       btn.classList.add("active");
       const tabId = btn.getAttribute("data-tab");
@@ -483,14 +594,17 @@ function setupTabSwitching() {
         tabContent.classList.add("active");
       }
 
+      // CRITICAL: Always update preview after tab switch
       updatePreview();
       console.log("Tab switched to:", tabId);
+      
+      // Refresh button states
       document.dispatchEvent(new Event("refresh-apply"));
     });
   });
 
   // 初始化一次按钮状态
-  refreshApplyButton();
+  // refreshApplyButton will be called after setupButtonEvents is initialized
 }
 // 确保初始化时setupTabSwitching被调用
 // 已在initializeEventListeners中调用，无需重复调用
@@ -565,11 +679,17 @@ function checkForConflicts() {
 }
 
 function updatePreview() {
+  console.log("🔄 [updatePreview] 被调用，loadedFiles.length:", loadedFiles.length);
+  
   if (loadedFiles.length === 0) return;
 
+  console.log("🔄 [updatePreview] 开始更新预览");
+  
   // 1. 更新所有文件的预览名称
   loadedFiles.forEach((fileInfo, index) => {
+    const oldNewPath = fileInfo.newPath;
     fileInfo.newPath = getPreviewName(fileInfo.name, false, index);
+    console.log(`🔄 [updatePreview] 文件${index}: ${fileInfo.name} -> ${oldNewPath} -> ${fileInfo.newPath}`);
   });
 
   // 2. 检查冲突和非法字符
@@ -602,13 +722,16 @@ function updatePreview() {
   });
 
   // 4. 更新“执行重命名”按钮状态
-  setupButtonEvents.refreshApplyButton();
+  document.dispatchEvent(new Event("refresh-apply"));
 }
 
 function getPreviewName(fileName, withHighlight = false, fileIndex = 0) {
+  // Use consistent method to get active tab
   const activeTab = document.querySelector(".tab-content.active");
   if (!activeTab) return fileName;
+  
   const tabId = activeTab.id;
+  
   switch (tabId) {
     case "tab-replace":
       return getPreviewForReplace(fileName, withHighlight);
@@ -648,8 +771,15 @@ function getPreviewName(fileName, withHighlight = false, fileIndex = 0) {
 }
 
 function getPreviewForReplace(fileName) {
-  const findText = findInput.value;
-  const replaceText = replaceInput.value;
+  if (!findInput) {
+    findInput = document.getElementById("find");
+  }
+  if (!replaceInput) {
+    replaceInput = document.getElementById("replace");
+  }
+  
+  const findText = findInput ? findInput.value : "";
+  const replaceText = replaceInput ? replaceInput.value : "";
 
   if (!findText) return fileName;
 
@@ -657,11 +787,17 @@ function getPreviewForReplace(fileName) {
 }
 
 function getPreviewForSequence(fileName, withHighlight = false, fileIndex = 0) {
-  const start = parseInt(startInput.value) || 1;
-  const digits = parseInt(digitsInput.value) || 2;
-  const position = document.querySelector(
-    'input[name="position"]:checked'
-  ).value;
+  if (!startInput) {
+    startInput = document.getElementById("start");
+  }
+  if (!digitsInput) {
+    digitsInput = document.getElementById("digits");
+  }
+  
+  const start = parseInt(startInput ? startInput.value : "1") || 1;
+  const digits = parseInt(digitsInput ? digitsInput.value : "2") || 2;
+  const positionElement = document.querySelector('input[name="position"]:checked');
+  const position = positionElement ? positionElement.value : "prefix";
 
   // 为每个文件计算不同的序列号
   const currentSequenceNumber = start + fileIndex;
@@ -688,44 +824,81 @@ function getPreviewForSequence(fileName, withHighlight = false, fileIndex = 0) {
 
 // 按钮事件相关
 function setupButtonEvents() {
+  console.log("🔧 [初始化] 开始设置按钮事件");
+  
   // 初始禁用状态
   const applyBtn = document.getElementById("apply-rename");
   const undoBtn = document.getElementById("undo-rename");
-  const redoBtn = document.getElementById("redo-rename");
+  
+  console.log("🔧 [初始化] 按钮元素检查:", {
+    applyBtn,
+    undoBtn,
+    applyRenameButton
+  });
+  
   if (applyBtn) applyBtn.disabled = true;
   if (undoBtn) undoBtn.disabled = true;
-  if (redoBtn) redoBtn.disabled = true;
   // 根据规则配置与文件列表使能“执行重命名”
   function refreshApplyButton() {
     const applyBtnEl = document.getElementById("apply-rename");
     const activeTab = document.querySelector(".tab-content.active");
     const hasFiles = loadedFiles && loadedFiles.length > 0;
     let valid = false;
+    
+    console.log("🔍 [按钮状态] 检查按钮状态:", {
+      hasFiles,
+      activeTabId: activeTab?.id,
+      loadedFilesCount: loadedFiles?.length
+    });
+    
     if (activeTab && activeTab.id === "tab-replace") {
       valid = !!(findInput && findInput.value);
+      console.log("🔍 [按钮状态] 替换标签页验证:", { valid, findValue: findInput?.value });
     } else if (activeTab && activeTab.id === "tab-sequence") {
+      const startValue = parseInt(startInput?.value) || 0;
+      const digitsValue = parseInt(digitsInput?.value) || 0;
+      const positionSelected = document.querySelector('input[name="position"]:checked');
       valid = !!(
         startInput &&
         startInput.value &&
+        startValue >= 0 &&
         digitsInput &&
-        digitsInput.value
+        digitsInput.value &&
+        digitsValue > 0 &&
+        positionSelected
       );
+      console.log("🔍 [按钮状态] 序列标签页验证:", { 
+        valid, 
+        startValue, 
+        digitsValue, 
+        positionSelected: positionSelected?.value,
+        startInputValue: startInput?.value,
+        digitsInputValue: digitsInput?.value
+      });
     } else if (activeTab && activeTab.id === "tab-case") {
       valid = !!document.querySelector(
         '#tab-case input[name="caseType"]:checked'
       );
+      console.log("🔍 [按钮状态] 大小写标签页验证:", { valid });
     }
+    
     // 检查是否有任何文件存在冲突或非法字符
     const hasAnyConflictOrInvalidChar = loadedFiles.some(
       (fileInfo) => fileInfo.hasConflict || fileInfo.invalidChar
     );
+    
+    const shouldEnable = hasFiles && valid && !hasAnyConflictOrInvalidChar;
+    console.log("🔍 [按钮状态] 最终状态:", { 
+      hasFiles, 
+      valid, 
+      hasAnyConflictOrInvalidChar, 
+      shouldEnable,
+      buttonDisabled: applyBtnEl?.disabled
+    });
 
-    if (applyBtnEl)
-      applyBtnEl.disabled = !(
-        hasFiles &&
-        valid &&
-        !hasAnyConflictOrInvalidChar
-      );
+    if (applyBtnEl) {
+      applyBtnEl.disabled = !shouldEnable;
+    }
   }
 
   // 绑定输入变化以刷新按钮状态
@@ -752,15 +925,17 @@ function setupButtonEvents() {
         const result = await invoke("undo_rename");
         if (result.success) {
           showErrorMsg("已撤销上一步重命名", true);
-          // 撤销成功后，需要从 undoStack 弹出，并推入 redoStack
-          if (undoStack.length > 0) {
-            redoStack.push(loadedFiles.map((f) => ({ ...f }))); // 当前状态推入 redoStack
-            loadedFiles = undoStack.pop(); // 恢复上一个状态
-            updateFileTable();
-            updateFileCount();
-            updateUndoRedoButtons();
-            saveHistory();
+          
+          // 更新文件列表中的文件名，恢复到撤销前的状态
+          if (result.undo_info && Array.isArray(result.undo_info)) {
+            updateFileNamesAfterUndo(result.undo_info);
           }
+          
+          updateFileTable();
+          updateFileCount();
+          
+          // 撤销成功后禁用撤销按钮
+          if (undoRenameButton) undoRenameButton.disabled = true;
         } else {
           showErrorMsg(result.error_message || "撤销失败");
         }
@@ -769,31 +944,7 @@ function setupButtonEvents() {
       }
     });
   }
-  // 重做按钮事件
-  const redoRenameButton = document.getElementById("redo-rename");
-  if (redoRenameButton) {
-    redoRenameButton.addEventListener("click", async () => {
-      try {
-        const result = await invoke("redo_rename");
-        if (result.success) {
-          showErrorMsg("已重做重命名", true);
-          // 重做成功后，需要从 redoStack 弹出，并推入 undoStack
-          if (redoStack.length > 0) {
-            undoStack.push(loadedFiles.map((f) => ({ ...f }))); // 当前状态推入 undoStack
-            loadedFiles = redoStack.pop(); // 恢复重做后的状态
-            updateFileTable();
-            updateFileCount();
-            updateUndoRedoButtons();
-            saveHistory();
-          }
-        } else {
-          showErrorMsg(result.error_message || "重做失败");
-        }
-      } catch (error) {
-        showErrorMsg("重做操作发生错误: " + error.message);
-      }
-    });
-  }
+  // 重做按钮已移除
 
   // 清空按钮
   clearAllButton.addEventListener("click", () => {
@@ -813,20 +964,47 @@ function setupButtonEvents() {
 
     // 清空操作历史栈并更新按钮状态
     undoStack = [];
-    redoStack = [];
-    updateUndoRedoButtons();
+    updateUndoButtons();
     saveHistory();
   });
 
   // 执行重命名按钮
-  applyRenameButton.addEventListener("click", async () => {
-    console.log("点击了执行重命名按钮");
+  console.log("🔧 [初始化] 正在绑定执行重命名按钮事件:", applyRenameButton);
+  
+  if (!applyRenameButton) {
+    console.error("❌ [初始化] 找不到执行重命名按钮元素!");
+    return;
+  }
+  
+  // 临时测试：强制启用按钮
+  setTimeout(() => {
+    console.log("🔧 [测试] 强制启用按钮进行测试");
+    applyRenameButton.disabled = false;
+  }, 2000);
+  
+  applyRenameButton.addEventListener("click", async (event) => {
+    console.log("🚀 [按钮点击] 点击了执行重命名按钮");
+    console.log("🚀 [按钮点击] 事件对象:", event);
+    console.log("🚀 [按钮点击] 按钮状态:", {
+      disabled: applyRenameButton.disabled,
+      loadedFilesCount: loadedFiles.length
+    });
+    
+    // 防止按钮被禁用时仍然执行
+    if (applyRenameButton.disabled) {
+      console.log("⚠️ [按钮点击] 按钮被禁用，停止执行");
+      return;
+    }
 
     // 收集文件路径数组
     const filePaths = loadedFiles.map((fileInfo) => fileInfo.path);
 
     // 收集当前激活选项卡和规则数据
     const activeTab = document.querySelector(".tab-content.active");
+    if (!activeTab) {
+      showErrorMsg("无法识别当前激活的标签页");
+      return;
+    }
     const activeTabId = activeTab.id.replace("tab-", "");
 
     let ruleData = {};
@@ -838,14 +1016,15 @@ function setupButtonEvents() {
           replace: replaceInput.value,
         };
         break;
-      case "sequence":
+      case "sequence": {
+        const positionElement = document.querySelector('input[name="position"]:checked');
         ruleData = {
           start: parseInt(startInput.value) || 1,
           digits: parseInt(digitsInput.value) || 2,
-          position: document.querySelector('input[name="position"]:checked')
-            .value,
+          position: positionElement ? positionElement.value : "prefix",
         };
         break;
+      }
       case "case": {
         const checked = document.querySelector(
           '#tab-case input[name="caseType"]:checked'
@@ -866,6 +1045,58 @@ function setupButtonEvents() {
   });
 }
 
+// 更新重命名后的文件名
+function updateFileNamesAfterRename(undoInfo) {
+  if (!Array.isArray(undoInfo)) return;
+  
+  console.log("🔄 [updateFileNamesAfterRename] 更新文件名，undoInfo:", undoInfo);
+  
+  // undoInfo 包含 {old_path, new_path} 的映射
+  undoInfo.forEach(renameInfo => {
+    const fileInfo = loadedFiles.find(f => f.path === renameInfo.old_path);
+    if (fileInfo) {
+      console.log("🔄 [updateFileNamesAfterRename] 更新文件:", {
+        oldPath: fileInfo.path,
+        oldName: fileInfo.name,
+        newPath: renameInfo.new_path,
+        newName: renameInfo.new_path.split(/[\\/]/).pop()
+      });
+      
+      // 更新文件路径和名称
+      fileInfo.path = renameInfo.new_path;
+      fileInfo.name = renameInfo.new_path.split(/[\\/]/).pop();
+      // 重命名后，newPath应该等于新的文件名，这样预览会显示"无变化"
+      fileInfo.newPath = fileInfo.name;
+      fileInfo.hasConflict = false;
+      fileInfo.invalidChar = false;
+    }
+  });
+  
+  console.log("🔄 [updateFileNamesAfterRename] 更新后的loadedFiles:", loadedFiles);
+  
+  // 重命名后立即更新预览，确保显示正确
+  updatePreview();
+}
+
+// 更新撤销后的文件名
+function updateFileNamesAfterUndo(undoInfo) {
+  if (!Array.isArray(undoInfo)) return;
+  
+  // 撤销时，new_path 变回 old_path
+  undoInfo.forEach(renameInfo => {
+    const fileInfo = loadedFiles.find(f => f.path === renameInfo.new_path);
+    if (fileInfo) {
+      // 恢复原始文件路径和名称
+      fileInfo.path = renameInfo.old_path;
+      fileInfo.name = renameInfo.old_path.split(/[\\/]/).pop();
+      // 重置预览相关状态
+      fileInfo.newPath = fileInfo.name;
+      fileInfo.hasConflict = false;
+      fileInfo.invalidChar = false;
+    }
+  });
+}
+
 // 调用 Tauri 后端执行重命名
 async function executeRename(filePaths, activeTabId, ruleData) {
   console.log("🚀 [前端日志] 开始执行重命名");
@@ -873,11 +1104,10 @@ async function executeRename(filePaths, activeTabId, ruleData) {
   console.log("🚀 [前端日志] 激活选项卡:", activeTabId);
   console.log("🚀 [前端日志] 规则数据:", ruleData);
 
-  // 操作前快照入undo栈，清空redo栈
+  // 操作前快照入undo栈
   if (loadedFiles.length > 0) {
     undoStack.push(loadedFiles.map((f) => ({ ...f })));
-    redoStack = [];
-    updateUndoRedoButtons();
+    // 撤销按钮状态将在重命名成功后更新
     saveHistory();
   }
   if (filePaths.length === 0) {
@@ -886,16 +1116,62 @@ async function executeRename(filePaths, activeTabId, ruleData) {
   }
 
   // 校验规则
-  if (activeTabId === "replace" && !ruleData.find) {
-    showErrorMsg("请输入要查找的内容");
+  if (activeTabId === "replace") {
+    if (!ruleData.find) {
+      showErrorMsg("请输入要查找的内容");
+      return;
+    }
+    if (ruleData.find.length === 0) {
+      showErrorMsg("查找内容不能为空");
+      return;
+    }
+  }
+  
+  if (activeTabId === "sequence") {
+    if (ruleData.start === undefined || ruleData.start === null) {
+      showErrorMsg("请填写序列号起始数字");
+      return;
+    }
+    if (ruleData.start < 0) {
+      showErrorMsg("序列号起始数字不能为负数");
+      return;
+    }
+    if (!ruleData.digits || ruleData.digits <= 0) {
+      showErrorMsg("序列号位数必须大于0");
+      return;
+    }
+    if (ruleData.digits > 10) {
+      showErrorMsg("序列号位数不能超过10位");
+      return;
+    }
+    if (!ruleData.position) {
+      showErrorMsg("请选择序列号位置（前缀或后缀）");
+      return;
+    }
+  }
+  
+  if (activeTabId === "case") {
+    if (!ruleData.caseType) {
+      showErrorMsg("请选择大小写转换类型");
+      return;
+    }
+    if (!["upper", "lower", "capitalize"].includes(ruleData.caseType)) {
+      showErrorMsg("无效的大小写转换类型");
+      return;
+    }
+  }
+
+  // 检查文件名冲突和非法字符
+  const conflictFiles = loadedFiles.filter(f => f.hasConflict);
+  const invalidCharFiles = loadedFiles.filter(f => f.invalidChar);
+  
+  if (conflictFiles.length > 0) {
+    showErrorMsg(`检测到 ${conflictFiles.length} 个文件存在重名冲突，请修改规则避免重复文件名`);
     return;
   }
-  if (activeTabId === "sequence" && (!ruleData.start || !ruleData.digits)) {
-    showErrorMsg("请填写序列号起始和位数");
-    return;
-  }
-  if (activeTabId === "case" && !ruleData.caseType) {
-    showErrorMsg("请选择大小写转换类型");
+  
+  if (invalidCharFiles.length > 0) {
+    showErrorMsg(`检测到 ${invalidCharFiles.length} 个文件包含非法字符（如 / 或 :），请修改规则`);
     return;
   }
 
@@ -956,8 +1232,10 @@ async function executeRename(filePaths, activeTabId, ruleData) {
           lastRenameUndoInfo = null;
           if (undoRenameButton) undoRenameButton.disabled = true;
         }
-        loadedFiles = [];
-        clearTable();
+        
+        // 更新文件列表中的文件名，而不是清空列表
+        updateFileNamesAfterRename(result.undo_info);
+        updateFileTable();
         updateFileCount();
       } else {
         showErrorMsg(result.error_message || "没有文件需要重命名");

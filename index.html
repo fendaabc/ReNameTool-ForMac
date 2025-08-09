@@ -221,10 +221,9 @@ aside {
           </div>
         </div>
         <div style="display: flex; gap: 1rem; margin-top: 1rem;">
-  <button id="apply-rename" class="primary-action" style="flex:1;">执行重命名</button>
-  <button id="undo-rename" class="secondary-action" style="flex:1;">撤销重命名</button>
-  <button id="redo-rename" class="secondary-action" style="flex:1;">重做</button>
-  <button id="clear-all" class="danger-action" style="flex:1;">全部清空</button>
+  <button id="apply-rename" class="primary-action" style="flex:1; white-space: nowrap;">执行重命名</button>
+  <button id="undo-rename" class="secondary-action" style="flex:1; white-space: nowrap;">撤销重命名</button>
+  <button id="clear-all" class="danger-action" style="flex:1; white-space: nowrap;">全部清空</button>
 </div>
 
       </aside>
@@ -263,6 +262,12 @@ aside {
             var tabId = btn.getAttribute('data-tab');
             var tabContent = document.getElementById(tabId);
             if(tabContent) tabContent.classList.add('active');
+            
+            // CRITICAL: 立即更新预览
+            if (window.updatePreview) {
+              window.updatePreview();
+            }
+            console.log("Tab switched to:", tabId);
           });
         });
         console.log("📋 DOM 已加载");
@@ -306,9 +311,89 @@ aside {
           }
         });
 
-        // 执行重命名按钮
+        // 执行重命名按钮事件
+        console.log("📋 [HTML] setupButtons 完成，apply-rename按钮:", applyRenameBtn);
+        
         applyRenameBtn.addEventListener("click", async () => {
-          await executeRename();
+          console.log("🚀 [HTML] 点击了执行重命名按钮");
+          
+          // 直接从DOM检查是否有文件
+          const fileRows = document.querySelectorAll("#file-table-body tr:not(#empty-tip-row)");
+          console.log("🚀 [HTML] 找到的文件行数:", fileRows.length);
+          
+          if (fileRows.length === 0) {
+            console.log("❌ [HTML] 没有找到文件，显示提示");
+            alert("请先选择文件");
+            return;
+          }
+          
+          // 等待main.js加载完成
+          let retryCount = 0;
+          while (!window.getLoadedFiles && retryCount < 10) {
+            console.log("⏳ [HTML] 等待main.js加载...", retryCount);
+            await new Promise(resolve => setTimeout(resolve, 100));
+            retryCount++;
+          }
+          
+          if (!window.getLoadedFiles) {
+            console.error("❌ [HTML] main.js未加载完成，使用备用方案");
+            alert("系统未完全加载，请稍后重试");
+            return;
+          }
+          
+          const loadedFiles = window.getLoadedFiles();
+          console.log("🚀 [HTML] loadedFiles:", loadedFiles);
+          
+          // 获取当前标签页
+          const activeTab = document.querySelector(".tab-content.active");
+          if (!activeTab) {
+            alert("无法识别当前激活的标签页");
+            return;
+          }
+          
+          const activeTabId = activeTab.id.replace("tab-", "");
+          console.log("🚀 [HTML] 当前标签页:", activeTabId);
+          
+          // 等待executeRename函数加载
+          let executeRetryCount = 0;
+          while (!window.executeRename && executeRetryCount < 20) {
+            console.log("⏳ [HTML] 等待executeRename函数加载...", executeRetryCount);
+            await new Promise(resolve => setTimeout(resolve, 50));
+            executeRetryCount++;
+          }
+          
+          // 调用main.js中的executeRename函数
+          if (window.executeRename) {
+            const filePaths = loadedFiles.map(f => f.path);
+            let ruleData = {};
+            
+            switch (activeTabId) {
+              case "replace":
+                ruleData = {
+                  find: document.getElementById("find").value,
+                  replace: document.getElementById("replace").value,
+                };
+                break;
+              case "sequence":
+                const positionElement = document.querySelector('input[name="position"]:checked');
+                ruleData = {
+                  start: parseInt(document.getElementById("start").value) || 1,
+                  digits: parseInt(document.getElementById("digits").value) || 2,
+                  position: positionElement ? positionElement.value : "prefix",
+                };
+                break;
+              case "case":
+                const checked = document.querySelector('#tab-case input[name="caseType"]:checked');
+                ruleData = { caseType: checked ? checked.value : "" };
+                break;
+            }
+            
+            console.log("🚀 [HTML] 调用executeRename:", { filePaths, activeTabId, ruleData });
+            await window.executeRename(filePaths, activeTabId, ruleData);
+          } else {
+            console.error("❌ [HTML] executeRename函数加载超时");
+            alert("系统未完全加载，请刷新页面重试");
+          }
         });
 
         // 清空按钮
@@ -316,12 +401,57 @@ aside {
           clearAll();
         });
 
-        // 实时预览
+        // 实时预览 - 为所有输入控件添加
         const findInput = document.getElementById("find");
         const replaceInput = document.getElementById("replace");
+        const startInput = document.getElementById("start");
+        const digitsInput = document.getElementById("digits");
 
-        findInput.addEventListener("input", updatePreview);
-        replaceInput.addEventListener("input", updatePreview);
+        // 直接绑定预览事件，使用简单的方式
+        function bindPreviewEvents() {
+          console.log("📋 [HTML] 开始绑定预览事件");
+          
+          findInput.addEventListener("input", () => {
+            console.log("📋 [HTML] find输入变化");
+            if (window.updatePreview) window.updatePreview();
+          });
+          
+          replaceInput.addEventListener("input", () => {
+            console.log("📋 [HTML] replace输入变化");
+            if (window.updatePreview) window.updatePreview();
+          });
+          
+          startInput.addEventListener("input", () => {
+            console.log("📋 [HTML] start输入变化");
+            if (window.updatePreview) window.updatePreview();
+          });
+          
+          digitsInput.addEventListener("input", () => {
+            console.log("📋 [HTML] digits输入变化");
+            if (window.updatePreview) window.updatePreview();
+          });
+
+          // 为序列位置单选框添加预览更新
+          document.querySelectorAll('input[name="position"]').forEach(function(radio) {
+            radio.addEventListener('change', () => {
+              console.log("📋 [HTML] position变化");
+              if (window.updatePreview) window.updatePreview();
+            });
+          });
+
+          // 为大小写转换单选框添加预览更新
+          document.querySelectorAll('#tab-case input[name="caseType"]').forEach(function(radio) {
+            radio.addEventListener('change', () => {
+              console.log("📋 [HTML] caseType变化");
+              if (window.updatePreview) window.updatePreview();
+            });
+          });
+          
+          console.log("📋 [HTML] 预览事件监听器绑定完成");
+        }
+        
+        // 立即绑定事件
+        bindPreviewEvents();
       }
 
       async function setupDragDrop() {
@@ -415,26 +545,7 @@ aside {
         }
       }
 
-      function displayFiles(files) {
-        const tbody = document.querySelector("tbody");
-        tbody.innerHTML = "";
-
-        files.forEach((file, index) => {
-          const fileName = file.split("/").pop() || file.split("\\\\").pop();
-          const row = document.createElement("tr");
-          row.innerHTML = `
-            <th scope="row">${index + 1}</th>
-            <td>${fileName}</td>
-            <td class="preview-highlight">准备重命名</td>
-          `;
-          tbody.appendChild(row);
-        });
-
-        document.getElementById(
-          "file-count"
-        ).textContent = `已加载 ${files.length} 个文件`;
-        console.log("📁 显示文件:", files);
-      }
+      // displayFiles函数已在下方重新定义
 
       // 全局变量存储当前文件列表
       let currentFiles = [];
@@ -545,14 +656,20 @@ aside {
       // 更新 displayFiles 函数以保存文件列表
       function displayFiles(files) {
         currentFiles = files; // 保存到全局变量
+        
+        // 同步到main.js中的loadedFiles变量
+        if (window.setLoadedFiles) {
+          window.setLoadedFiles(files);
+        }
 
-        const tbody = document.querySelector("tbody");
+        const tbody = document.getElementById("file-table-body");
         tbody.innerHTML = "";
 
         files.forEach((file, index) => {
           const fileName = file.split("/").pop() || file.split("\\\\").pop();
-          const previewName = getPreviewName(fileName);
-          const hasChange = previewName !== fileName;
+          // 初始状态不显示预览，等待用户输入规则后再更新
+          const previewName = fileName;
+          const hasChange = false;
 
           const row = document.createElement("tr");
           row.innerHTML = `
@@ -571,75 +688,68 @@ aside {
           "file-count"
         ).textContent = `已加载 ${files.length} 个文件`;
         console.log("📁 显示文件:", files);
+        
+        // 初始化预览
+        setTimeout(() => {
+          if (window.updatePreview) {
+            console.log("📁 [displayFiles] 调用updatePreview初始化预览");
+            window.updatePreview();
+          }
+        }, 100);
       }
 
-      // 获取预览名称
-      function getPreviewName(fileName) {
+      // 获取预览名称 - 支持所有标签页类型
+      function getPreviewName(fileName, fileIndex = 0) {
         const activeTab = document.querySelector(".tab-content.active");
         if (!activeTab) return fileName;
 
         const tabId = activeTab.id;
 
-        if (tabId === "tab-replace") {
-          const findText = document.getElementById("find").value;
-          const replaceText = document.getElementById("replace").value;
-
-          if (!findText) return fileName;
-
-          return fileName.replace(new RegExp(findText, "g"), replaceText);
-        }
-
-        return fileName;
-      }
-
-      // 执行重命名
-      async function executeRename() {
-        if (currentFiles.length === 0) {
-          alert("请先选择文件");
-          return;
-        }
-
-        const findText = document.getElementById("find").value;
-        const replaceText = document.getElementById("replace").value;
-
-        if (!findText) {
-          alert("请输入要查找的内容");
-          return;
-        }
-
-        try {
-          const { invoke } = window.__TAURI__.core;
-          const result = await invoke("execute_rename", {
-            filePaths: currentFiles,
-            rule: {
-              type: "replace",
-              find: findText,
-              replace: replaceText || "",
-            },
-          });
-
-          console.log("重命名结果:", result);
-
-          if (result.success) {
-            if (result.renamed_count > 0) {
-              alert(`成功重命名 ${result.renamed_count} 个文件`);
-              clearAll();
-            } else {
-              alert(result.error_message || "没有文件需要重命名");
-            }
-          } else {
-            alert(`重命名失败: ${result.error_message || "未知错误"}`);
+        switch (tabId) {
+          case "tab-replace": {
+            const findText = document.getElementById("find").value;
+            const replaceText = document.getElementById("replace").value;
+            if (!findText) return fileName;
+            return fileName.replace(new RegExp(findText, "g"), replaceText);
           }
-        } catch (error) {
-          console.error("调用后端失败:", error);
-          alert("执行重命名时发生错误: " + error.message);
+          case "tab-sequence": {
+            const start = parseInt(document.getElementById("start").value) || 1;
+            const digits = parseInt(document.getElementById("digits").value) || 2;
+            const position = document.querySelector('input[name="position"]:checked')?.value || "prefix";
+            
+            const currentSequenceNumber = start + fileIndex;
+            const sequenceNumber = currentSequenceNumber.toString().padStart(digits, "0");
+            
+            const fileExtension = fileName.includes(".") ? "." + fileName.split(".").pop() : "";
+            const fileNameWithoutExt = fileName.includes(".") ? fileName.substring(0, fileName.lastIndexOf(".")) : fileName;
+            
+            return position === "prefix" 
+              ? `${sequenceNumber}_${fileName}`
+              : `${fileNameWithoutExt}_${sequenceNumber}${fileExtension}`;
+          }
+          case "tab-case": {
+            const checked = document.querySelector('#tab-case input[name="caseType"]:checked');
+            if (!checked) return fileName;
+            const val = checked.value;
+            
+            if (val === "lower") return fileName.toLowerCase();
+            else if (val === "upper") return fileName.toUpperCase();
+            else if (val === "capitalize") {
+              return fileName.replace(/(^|[^a-zA-Z])([a-z])/g, (m, pre, char) => pre + char.toUpperCase());
+            }
+            return fileName;
+          }
+          default:
+            return fileName;
         }
       }
+
+      // 执行重命名功能由 main.js 中的完整实现处理
 
       // 清空所有
       function clearAll() {
         currentFiles = [];
-        const tbody = document.querySelector("tbody");
+        const tbody = document.getElementById("file-table-body");
         tbody.innerHTML = "";
         document.getElementById("file-count").textContent = "已加载 0 个文件";
 
@@ -648,28 +758,7 @@ aside {
         document.getElementById("replace").value = "";
       }
 
-      // 更新预览
-      function updatePreview() {
-        if (currentFiles.length === 0) return;
-
-        const previewCells = document.querySelectorAll(".preview-cell");
-
-        currentFiles.forEach((file, index) => {
-          if (index < previewCells.length) {
-            const fileName = file.split("/").pop() || file.split("\\\\").pop();
-            const previewName = getPreviewName(fileName);
-            const cell = previewCells[index];
-
-            if (previewName !== fileName) {
-              cell.textContent = previewName;
-              cell.className = "preview-cell preview-highlight";
-            } else {
-              cell.textContent = "(无变化)";
-              cell.className = "preview-cell dimmed";
-            }
-          }
-        });
-      }
+      // updatePreview函数现在由main.js提供
     </script>
   <script type="module" src="src/main.js"></script>
 </body>
