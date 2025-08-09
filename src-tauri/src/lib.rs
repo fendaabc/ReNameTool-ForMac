@@ -2,9 +2,7 @@ use std::fs;
 use std::path::{Path, PathBuf};
 use std::collections::HashMap;
 use serde::{Deserialize, Serialize};
-use std::sync::Mutex;
-#[macro_use]
-extern crate lazy_static;
+
 
 // 添加日志宏
 macro_rules! log_info {
@@ -19,16 +17,7 @@ macro_rules! log_error {
     };
 }
 
-// 多步撤销/重做历史结构
-#[derive(Clone, Serialize, Deserialize, Debug)]
-pub struct RenameHistory {
-    pub operations: Vec<(String, String)>, // (from, to)
-}
 
-lazy_static::lazy_static! {
-    pub static ref RENAME_HISTORY_STACK: Mutex<Vec<RenameHistory>> = Mutex::new(Vec::new());
-    pub static ref REDO_HISTORY_STACK: Mutex<Vec<RenameHistory>> = Mutex::new(Vec::new());
-}
 
 #[derive(Serialize, Deserialize)]
 struct FileInfo {
@@ -199,43 +188,7 @@ async fn rename_files(operations: Vec<RenameOperation>) -> Result<RenameResult, 
     })
 }
 
-#[tauri::command]
-async fn redo_rename() -> Result<ExecuteRenameResult, String> {
-    use std::fs;
-    let mut redo_stack = REDO_HISTORY_STACK.lock().unwrap();
-    if let Some(history) = redo_stack.pop() {
-        let mut stack = RENAME_HISTORY_STACK.lock().unwrap();
-        let mut success_count = 0;
-        let mut errors = Vec::new();
-        // 顺序重做
-        for (from, to) in history.operations.iter() {
-            match fs::rename(from, to) {
-                Ok(_) => success_count += 1,
-                Err(e) => errors.push(format!("重做失败 {}: {}", from, e)),
-            }
-        }
-        stack.push(history);
-        if errors.is_empty() {
-            Ok(ExecuteRenameResult {
-                success: true,
-                renamed_count: success_count,
-                error_message: None,
-            })
-        } else {
-            Ok(ExecuteRenameResult {
-                success: false,
-                renamed_count: success_count,
-                error_message: Some(errors.join("; ")),
-            })
-        }
-    } else {
-        Ok(ExecuteRenameResult {
-            success: false,
-            renamed_count: 0,
-            error_message: Some("没有可重做的历史记录".to_string()),
-        })
-    }
-}
+
 
 #[tauri::command]
 async fn execute_rename(file_paths: Vec<String>, rule: RenameRule) -> Result<ExecuteRenameResult, String> {
@@ -388,13 +341,7 @@ async fn execute_rename(file_paths: Vec<String>, rule: RenameRule) -> Result<Exe
         }
     }
 
-    // 历史入栈，清空redo栈
-    if !op_history.is_empty() {
-        let mut stack = RENAME_HISTORY_STACK.lock().unwrap();
-        stack.push(RenameHistory { operations: op_history });
-        let mut redo_stack = REDO_HISTORY_STACK.lock().unwrap();
-        redo_stack.clear();
-    }
+
 
     let result = if errors.is_empty() {
         log_info!("🦀 [后端日志] 重命名操作完成，成功: {}", success_count);
@@ -450,8 +397,7 @@ pub fn run() {
             execute_rename, 
             get_files_from_paths, 
             list_files,
-            check_file_permission,
-            redo_rename
+            check_file_permission
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
