@@ -238,44 +238,6 @@ async fn redo_rename() -> Result<ExecuteRenameResult, String> {
 }
 
 #[tauri::command]
-async fn undo_rename() -> Result<ExecuteRenameResult, String> {
-    use std::fs;
-    let mut stack = RENAME_HISTORY_STACK.lock().unwrap();
-    if let Some(history) = stack.pop() {
-        let mut redo_stack = REDO_HISTORY_STACK.lock().unwrap();
-        let mut success_count = 0;
-        let mut errors = Vec::new();
-        // 逆序撤销
-        for (from, to) in history.operations.iter().rev() {
-            match fs::rename(to, from) {
-                Ok(_) => success_count += 1,
-                Err(e) => errors.push(format!("撤销失败 {}: {}", to, e)),
-            }
-        }
-        redo_stack.push(history);
-        if errors.is_empty() {
-            Ok(ExecuteRenameResult {
-                success: true,
-                renamed_count: success_count,
-                error_message: None,
-            })
-        } else {
-            Ok(ExecuteRenameResult {
-                success: false,
-                renamed_count: success_count,
-                error_message: Some(errors.join("; ")),
-            })
-        }
-    } else {
-        Ok(ExecuteRenameResult {
-            success: false,
-            renamed_count: 0,
-            error_message: Some("没有可撤销的历史记录".to_string()),
-        })
-    }
-}
-
-#[tauri::command]
 async fn execute_rename(file_paths: Vec<String>, rule: RenameRule) -> Result<ExecuteRenameResult, String> {
     log_info!("🦀 [后端日志] execute_rename 被调用");
     log_info!("🦀 [后端日志] 文件路径数量: {}", file_paths.len());
@@ -489,7 +451,6 @@ pub fn run() {
             get_files_from_paths, 
             list_files,
             check_file_permission,
-            undo_rename, 
             redo_rename
         ])
         .run(tauri::generate_context!())

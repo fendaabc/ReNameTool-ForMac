@@ -89,10 +89,7 @@ console.log("=== JavaScript 文件已加载 ===");
 
 // 全局变量存储文件信息
 let loadedFiles = [];
-let lastRenameUndoInfo = null;
-let undoRenameButton = null;
-// 撤销操作历史栈
-let undoStack = [];
+
 
 // 立即暴露函数到window对象，不等待DOM加载
 window.getLoadedFiles = () => {
@@ -135,14 +132,14 @@ console.log("🔧 [main.js] 函数已立即暴露");
 
 // 操作历史持久化
 function saveHistory() {
-  localStorage.setItem("renameUndoStack", JSON.stringify(undoStack));
+
 }
 function loadHistory() {
   try {
     const u = localStorage.getItem("renameUndoStack");
-    undoStack = u ? JSON.parse(u) : [];
+
   } catch (e) {
-    undoStack = [];
+
   }
 }
 
@@ -188,18 +185,9 @@ document.addEventListener("DOMContentLoaded", () => {
   console.log("=== DOM 已加载，开始初始化 ===");
 
   initializeElements();
-  // 按钮状态更新函数
-  window.updateUndoButtons = function () {
-    const undoRenameButton = document.getElementById("undo-rename");
-    // 撤销按钮状态现在由重命名和撤销操作直接管理
-    // 这个函数保留用于初始化
-    if (undoRenameButton) undoRenameButton.disabled = true;
-  };
-
+  
   initializeEventListeners();
-  // 确保在所有事件监听器设置完毕后，更新一次按钮状态
-  updateUndoButtons();
-
+  
   // 添加简单的拖拽测试
   testDragDrop();
   
@@ -261,15 +249,13 @@ function initializeElements() {
   fileCountElement = document.getElementById("file-count");
   clearAllButton = document.getElementById("clear-all");
   applyRenameButton = document.getElementById("apply-rename");
-  undoRenameButton = document.getElementById("undo-rename");
 
   console.log("🔧 [初始化] 主要元素:", {
     dropZone: !!dropZone,
     fileTable: !!fileTable,
     fileCountElement: !!fileCountElement,
     applyRenameButton: !!applyRenameButton,
-    clearAllButton: !!clearAllButton,
-    undoRenameButton: !!undoRenameButton
+    clearAllButton: !!clearAllButton
   });
 
   tabLinks = document.querySelectorAll(".tab-link");
@@ -828,16 +814,14 @@ function setupButtonEvents() {
   
   // 初始禁用状态
   const applyBtn = document.getElementById("apply-rename");
-  const undoBtn = document.getElementById("undo-rename");
   
   console.log("🔧 [初始化] 按钮元素检查:", {
     applyBtn,
-    undoBtn,
     applyRenameButton
   });
+  // 重做按钮已移除
   
   if (applyBtn) applyBtn.disabled = true;
-  if (undoBtn) undoBtn.disabled = true;
   // 根据规则配置与文件列表使能“执行重命名”
   function refreshApplyButton() {
     const applyBtnEl = document.getElementById("apply-rename");
@@ -918,34 +902,6 @@ function setupButtonEvents() {
   // 允许外部触发刷新（如Tab切换）
   document.addEventListener("refresh-apply", refreshApplyButton);
 
-  // 撤销按钮事件
-  if (undoRenameButton) {
-    undoRenameButton.addEventListener("click", async () => {
-      try {
-        const result = await invoke("undo_rename");
-        if (result.success) {
-          showErrorMsg("已撤销上一步重命名", true);
-          
-          // 更新文件列表中的文件名，恢复到撤销前的状态
-          if (result.undo_info && Array.isArray(result.undo_info)) {
-            updateFileNamesAfterUndo(result.undo_info);
-          }
-          
-          updateFileTable();
-          updateFileCount();
-          
-          // 撤销成功后禁用撤销按钮
-          if (undoRenameButton) undoRenameButton.disabled = true;
-        } else {
-          showErrorMsg(result.error_message || "撤销失败");
-        }
-      } catch (error) {
-        showErrorMsg("撤销操作发生错误: " + error.message);
-      }
-    });
-  }
-  // 重做按钮已移除
-
   // 清空按钮
   clearAllButton.addEventListener("click", () => {
     // 清空文件列表
@@ -962,9 +918,7 @@ function setupButtonEvents() {
     // 重置单选框到默认状态
     document.getElementById("pos-prefix").checked = true;
 
-    // 清空操作历史栈并更新按钮状态
-    undoStack = [];
-    updateUndoButtons();
+
     saveHistory();
   });
 
@@ -1046,13 +1000,13 @@ function setupButtonEvents() {
 }
 
 // 更新重命名后的文件名
-function updateFileNamesAfterRename(undoInfo) {
-  if (!Array.isArray(undoInfo)) return;
+function updateFileNamesAfterRename(renamedFiles) {
+  if (!Array.isArray(renamedFiles)) return;
   
-  console.log("🔄 [updateFileNamesAfterRename] 更新文件名，undoInfo:", undoInfo);
+  console.log("🔄 [updateFileNamesAfterRename] 更新文件名，renamedFiles:", renamedFiles);
   
-  // undoInfo 包含 {old_path, new_path} 的映射
-  undoInfo.forEach(renameInfo => {
+  // renamedFiles 包含 {old_path, new_path} 的映射
+  renamedFiles.forEach(renameInfo => {
     const fileInfo = loadedFiles.find(f => f.path === renameInfo.old_path);
     if (fileInfo) {
       console.log("🔄 [updateFileNamesAfterRename] 更新文件:", {
@@ -1078,24 +1032,7 @@ function updateFileNamesAfterRename(undoInfo) {
   updatePreview();
 }
 
-// 更新撤销后的文件名
-function updateFileNamesAfterUndo(undoInfo) {
-  if (!Array.isArray(undoInfo)) return;
-  
-  // 撤销时，new_path 变回 old_path
-  undoInfo.forEach(renameInfo => {
-    const fileInfo = loadedFiles.find(f => f.path === renameInfo.new_path);
-    if (fileInfo) {
-      // 恢复原始文件路径和名称
-      fileInfo.path = renameInfo.old_path;
-      fileInfo.name = renameInfo.old_path.split(/[\\/]/).pop();
-      // 重置预览相关状态
-      fileInfo.newPath = fileInfo.name;
-      fileInfo.hasConflict = false;
-      fileInfo.invalidChar = false;
-    }
-  });
-}
+
 
 // 调用 Tauri 后端执行重命名
 async function executeRename(filePaths, activeTabId, ruleData) {
@@ -1104,12 +1041,7 @@ async function executeRename(filePaths, activeTabId, ruleData) {
   console.log("🚀 [前端日志] 激活选项卡:", activeTabId);
   console.log("🚀 [前端日志] 规则数据:", ruleData);
 
-  // 操作前快照入undo栈
-  if (loadedFiles.length > 0) {
-    undoStack.push(loadedFiles.map((f) => ({ ...f })));
-    // 撤销按钮状态将在重命名成功后更新
-    saveHistory();
-  }
+
   if (filePaths.length === 0) {
     showErrorMsg("请先选择文件");
     return;
@@ -1225,16 +1157,10 @@ async function executeRename(filePaths, activeTabId, ruleData) {
       if (result.renamed_count > 0) {
         showErrorMsg(`成功重命名 ${result.renamed_count} 个文件`, true);
         // 保存撤销信息
-        if (Array.isArray(result.undo_info)) {
-          lastRenameUndoInfo = { undo_map: result.undo_info };
-          if (undoRenameButton) undoRenameButton.disabled = false;
-        } else {
-          lastRenameUndoInfo = null;
-          if (undoRenameButton) undoRenameButton.disabled = true;
-        }
+
         
         // 更新文件列表中的文件名，而不是清空列表
-        updateFileNamesAfterRename(result.undo_info);
+        updateFileNamesAfterRename(result.renamed_files);
         updateFileTable();
         updateFileCount();
       } else {
