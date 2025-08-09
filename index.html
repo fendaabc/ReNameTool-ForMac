@@ -612,6 +612,7 @@ aside {
           const result = await invoke("execute_rename", {
             filePaths: currentFiles,
             rule: {
+              type: "replace",
               find: findText,
               replace: replaceText || "",
             },

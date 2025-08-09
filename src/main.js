@@ -1,45 +1,54 @@
 // 统一错误提示函数（顶部toast横幅）
 function showErrorMsg(msg, isSuccess = false) {
-  if (typeof msg === 'object' && msg !== null) {
+  if (typeof msg === "object" && msg !== null) {
     msg = msg.error_message || msg.message || JSON.stringify(msg);
   }
   // 常见错误归纳
   if (!isSuccess) {
-    if (msg.includes('EACCES') || msg.includes('权限')) msg = '操作被拒绝：请检查文件权限';
-    else if (msg.includes('busy') || msg.includes('占用')) msg = '文件被占用或正在使用，无法操作';
-    else if (msg.includes('not found') || msg.includes('不存在')) msg = '目标文件不存在';
-    else if (msg.includes('conflict') || msg.includes('重名')) msg = '存在重名冲突，请检查文件名';
-    else if (msg.includes('timeout') || msg.includes('超时')) msg = '操作超时，请重试或分批导入';
+    if (msg.includes("EACCES") || msg.includes("权限"))
+      msg = "操作被拒绝：请检查文件权限";
+    else if (msg.includes("busy") || msg.includes("占用"))
+      msg = "文件被占用或正在使用，无法操作";
+    else if (msg.includes("not found") || msg.includes("不存在"))
+      msg = "目标文件不存在";
+    else if (msg.includes("conflict") || msg.includes("重名"))
+      msg = "存在重名冲突，请检查文件名";
+    else if (msg.includes("timeout") || msg.includes("超时"))
+      msg = "操作超时，请重试或分批导入";
   }
-  let toast = document.getElementById('toast-banner');
+  let toast = document.getElementById("toast-banner");
   if (!toast) {
-    toast = document.createElement('div');
-    toast.id = 'toast-banner';
-    toast.style.position = 'fixed';
-    toast.style.top = '24px';
-    toast.style.left = '50%';
-    toast.style.transform = 'translateX(-50%)';
-    toast.style.zIndex = '9999';
-    toast.style.minWidth = '220px';
-    toast.style.maxWidth = '90vw';
-    toast.style.padding = '0.8em 1.7em';
-    toast.style.borderRadius = '1.6em';
-    toast.style.fontSize = '1.07em';
-    toast.style.fontWeight = '600';
-    toast.style.boxShadow = '0 4px 32px #0002';
-    toast.style.textAlign = 'center';
-    toast.style.transition = 'opacity 0.3s';
+    toast = document.createElement("div");
+    toast.id = "toast-banner";
+    toast.style.position = "fixed";
+    toast.style.top = "24px";
+    toast.style.left = "50%";
+    toast.style.transform = "translateX(-50%)";
+    toast.style.zIndex = "9999";
+    toast.style.minWidth = "220px";
+    toast.style.maxWidth = "90vw";
+    toast.style.padding = "0.8em 1.7em";
+    toast.style.borderRadius = "1.6em";
+    toast.style.fontSize = "1.07em";
+    toast.style.fontWeight = "600";
+    toast.style.boxShadow = "0 4px 32px #0002";
+    toast.style.textAlign = "center";
+    toast.style.transition = "opacity 0.3s";
     document.body.appendChild(toast);
   }
-  toast.style.opacity = '1';
-  toast.style.background = isSuccess ? '#e7fbe7' : '#fff3f3';
-  toast.style.color = isSuccess ? '#1a7f1a' : '#c00';
-  toast.style.border = isSuccess ? '1.5px solid #8be28b' : '1.5px solid #ffb3b3';
-  toast.textContent = (isSuccess ? '✅ ' : '❌ ') + msg;
+  toast.style.opacity = "1";
+  toast.style.background = isSuccess ? "#e7fbe7" : "#fff3f3";
+  toast.style.color = isSuccess ? "#1a7f1a" : "#c00";
+  toast.style.border = isSuccess
+    ? "1.5px solid #8be28b"
+    : "1.5px solid #ffb3b3";
+  toast.textContent = (isSuccess ? "✅ " : "❌ ") + msg;
   clearTimeout(toast._timeoutId);
   toast._timeoutId = setTimeout(() => {
-    toast.style.opacity = '0';
-    setTimeout(() => { if (toast.parentNode) toast.parentNode.removeChild(toast); }, 400);
+    toast.style.opacity = "0";
+    setTimeout(() => {
+      if (toast.parentNode) toast.parentNode.removeChild(toast);
+    }, 400);
   }, 3200);
 }
 
@@ -47,7 +56,7 @@ function showErrorMsg(msg, isSuccess = false) {
 const themeOrder = ["light", "purelight", "dark"];
 let currentThemeIdx = 0;
 const html = document.documentElement;
-window.addEventListener('DOMContentLoaded', () => {
+window.addEventListener("DOMContentLoaded", () => {
   const themeToggle = document.getElementById("theme-toggle");
   const themeIcon = document.getElementById("theme-icon");
   function setTheme(idx) {
@@ -88,13 +97,13 @@ let redoStack = [];
 
 // 操作历史持久化
 function saveHistory() {
-  localStorage.setItem('renameUndoStack', JSON.stringify(undoStack));
-  localStorage.setItem('renameRedoStack', JSON.stringify(redoStack));
+  localStorage.setItem("renameUndoStack", JSON.stringify(undoStack));
+  localStorage.setItem("renameRedoStack", JSON.stringify(redoStack));
 }
 function loadHistory() {
   try {
-    const u = localStorage.getItem('renameUndoStack');
-    const r = localStorage.getItem('renameRedoStack');
+    const u = localStorage.getItem("renameUndoStack");
+    const r = localStorage.getItem("renameRedoStack");
     undoStack = u ? JSON.parse(u) : [];
     redoStack = r ? JSON.parse(r) : [];
   } catch (e) {
@@ -102,7 +111,6 @@ function loadHistory() {
     redoStack = [];
   }
 }
-
 
 // DOM 元素引用
 let dropZone;
@@ -123,18 +131,18 @@ let digitsInput;
 let positionRadios;
 
 // 确保DOM加载完成后执行
-document.addEventListener('DOMContentLoaded', () => {
+document.addEventListener("DOMContentLoaded", () => {
   initializeEventListeners();
-  
+
   // 初始化主题
   initializeTheme();
-  
+
   loadHistory();
   console.log("=== DOM 已加载，开始初始化 ===");
-  
+
   initializeElements();
   // 按钮状态更新函数
-  window.updateUndoRedoButtons = function() {
+  window.updateUndoRedoButtons = function () {
     const undoRenameButton = document.getElementById("undo-rename");
     const redoRenameButton = document.getElementById("redo-rename");
     if (undoRenameButton) undoRenameButton.disabled = undoStack.length === 0;
@@ -144,7 +152,7 @@ document.addEventListener('DOMContentLoaded', () => {
   initializeEventListeners();
   // 确保在所有事件监听器设置完毕后，更新一次按钮状态
   updateUndoRedoButtons();
-  
+
   // 添加简单的拖拽测试
   testDragDrop();
 });
@@ -152,47 +160,47 @@ document.addEventListener('DOMContentLoaded', () => {
 // 简单的拖拽测试函数
 function testDragDrop() {
   console.log("=== 开始设置拖拽测试 ===");
-  
+
   // 在整个文档上监听拖拽事件
-  document.addEventListener('dragenter', function(e) {
-    console.log('🔥 Document dragenter detected!', e);
-    document.body.style.border = '3px solid red';
+  document.addEventListener("dragenter", function (e) {
+    console.log("🔥 Document dragenter detected!", e);
+    document.body.style.border = "3px solid red";
     e.preventDefault();
   });
-  
-  document.addEventListener('dragover', function(e) {
-    console.log('🔥 Document dragover detected!', e);
+
+  document.addEventListener("dragover", function (e) {
+    console.log("🔥 Document dragover detected!", e);
     e.preventDefault();
   });
-  
-  document.addEventListener('drop', function(e) {
-    console.log('🔥 Document drop detected!', e);
-    console.log('🔥 Files:', e.dataTransfer.files);
-    document.body.style.border = '';
+
+  document.addEventListener("drop", function (e) {
+    console.log("🔥 Document drop detected!", e);
+    console.log("🔥 Files:", e.dataTransfer.files);
+    document.body.style.border = "";
     e.preventDefault();
   });
-  
-  document.addEventListener('dragleave', function(e) {
-    console.log('🔥 Document dragleave detected!', e);
-    document.body.style.border = '';
+
+  document.addEventListener("dragleave", function (e) {
+    console.log("🔥 Document dragleave detected!", e);
+    document.body.style.border = "";
   });
-  
+
   // 也在 body 上监听
-  document.body.addEventListener('dragenter', function(e) {
-    console.log('🟢 Body dragenter detected!', e);
+  document.body.addEventListener("dragenter", function (e) {
+    console.log("🟢 Body dragenter detected!", e);
     e.preventDefault();
   });
-  
-  document.body.addEventListener('dragover', function(e) {
-    console.log('🟢 Body dragover detected!', e);
+
+  document.body.addEventListener("dragover", function (e) {
+    console.log("🟢 Body dragover detected!", e);
     e.preventDefault();
   });
-  
-  document.body.addEventListener('drop', function(e) {
-    console.log('🟢 Body drop detected!', e);
+
+  document.body.addEventListener("drop", function (e) {
+    console.log("🟢 Body drop detected!", e);
     e.preventDefault();
   });
-  
+
   console.log("=== 拖拽测试监听器已设置 ===");
 }
 
@@ -293,7 +301,7 @@ function setupFileHandling() {
 async function setupTauriDragDrop() {
   try {
     console.log("=== 开始设置 Tauri 拖拽事件 ===");
-    
+
     // 监听文件拖拽事件
     await listen("tauri://file-drop", async (event) => {
       console.log("🚀 检测到 Tauri 文件拖拽事件:", event);
@@ -318,13 +326,12 @@ async function setupTauriDragDrop() {
     });
 
     console.log("=== Tauri 拖拽事件监听器已设置 ===");
-    
+
     // 测试：3秒后显示一个提示，确认 JavaScript 正在运行
     setTimeout(() => {
       console.log("✅ JavaScript 正在正常运行，拖拽功能应该已激活");
       console.log("✅ 请尝试从 Finder 拖拽文件到应用窗口");
     }, 3000);
-    
   } catch (error) {
     console.error("❌ 设置 Tauri 拖拽事件失败:", error);
   }
@@ -332,11 +339,11 @@ async function setupTauriDragDrop() {
 
 async function handleFilePathsWithFolders(paths) {
   // 显示加载中提示
-  const fileCountElem = document.getElementById('file-count');
-  let loadingBackup = '';
+  const fileCountElem = document.getElementById("file-count");
+  let loadingBackup = "";
   if (fileCountElem) {
     loadingBackup = fileCountElem.textContent;
-    fileCountElem.textContent = '正在加载文件，请稍候...';
+    fileCountElem.textContent = "正在加载文件，请稍候...";
   }
   let timeoutId = null;
   try {
@@ -344,11 +351,12 @@ async function handleFilePathsWithFolders(paths) {
     let timedOut = false;
     timeoutId = setTimeout(() => {
       timedOut = true;
-      if (fileCountElem) fileCountElem.textContent = '加载文件超时，请检查文件夹内容或重试';
+      if (fileCountElem)
+        fileCountElem.textContent = "加载文件超时，请检查文件夹内容或重试";
     }, 10000);
 
     // 调用 Tauri 后端递归获取所有文件
-    const files = await invoke('list_files', { paths });
+    const files = await invoke("list_files", { paths });
     clearTimeout(timeoutId);
     if (timedOut) return;
 
@@ -356,10 +364,20 @@ async function handleFilePathsWithFolders(paths) {
     let checkedFiles = [];
     for (const f of files) {
       try {
-        const perm = await invoke('check_file_permission', { path: f });
-        checkedFiles.push({ name: f.split(/[\\/]/).pop(), path: f, readable: perm.readable, writable: perm.writable });
+        const perm = await invoke("check_file_permission", { path: f });
+        checkedFiles.push({
+          name: f.split(/[\\/]/).pop(),
+          path: f,
+          readable: perm.readable,
+          writable: perm.writable,
+        });
       } catch (e) {
-        checkedFiles.push({ name: f.split(/[\\/]/).pop(), path: f, readable: false, writable: false });
+        checkedFiles.push({
+          name: f.split(/[\\/]/).pop(),
+          path: f,
+          readable: false,
+          writable: false,
+        });
       }
     }
     loadedFiles = checkedFiles;
@@ -368,16 +386,17 @@ async function handleFilePathsWithFolders(paths) {
 
     updatePreview();
     // 只显示文件数量统计
-    const fileCountElem = document.getElementById('file-count');
+    const fileCountElem = document.getElementById("file-count");
     if (fileCountElem) {
       fileCountElem.textContent = `已加载 ${loadedFiles.length} 个文件`;
     }
     // 空状态提示行显示/隐藏
-    const emptyRow = document.getElementById('empty-tip-row');
-    if (emptyRow) emptyRow.style.display = loadedFiles.length === 0 ? '' : 'none';
+    const emptyRow = document.getElementById("empty-tip-row");
+    if (emptyRow)
+      emptyRow.style.display = loadedFiles.length === 0 ? "" : "none";
     // 空文件夹或无有效文件时友好提示
     if (loadedFiles.length === 0) {
-      showErrorMsg('未检测到可导入的文件。');
+      showErrorMsg("未检测到可导入的文件。");
     }
   } catch (error) {
     console.error("处理文件路径失败:", error);
@@ -389,50 +408,53 @@ async function handleFilePathsWithFolders(paths) {
 
 function clearTable() {
   if (!fileTable) return;
-  fileTable.innerHTML = '';
+  fileTable.innerHTML = "";
 }
 
 function updateFileTable() {
   clearTable();
-  const emptyRow = document.getElementById('empty-tip-row');
-  const applyRenameButton = document.getElementById('apply-rename');
+  const emptyRow = document.getElementById("empty-tip-row");
+  const applyRenameButton = document.getElementById("apply-rename");
   if (loadedFiles.length === 0) {
-    if (emptyRow) emptyRow.style.display = '';
+    if (emptyRow) emptyRow.style.display = "";
     if (applyRenameButton) applyRenameButton.disabled = true;
     return;
   }
-  if (emptyRow) emptyRow.style.display = 'none';
+  if (emptyRow) emptyRow.style.display = "none";
   // 确保loadedFiles中的文件信息是最新的，包括newPath, hasConflict, invalidChar
   // 这一步在updatePreview中已经完成，这里只需使用
 
   loadedFiles.forEach((fileInfo, index) => {
     const hasChange = fileInfo.newPath && fileInfo.newPath !== fileInfo.name;
-    let warn = '';
-    let rowClass = '';
+    let warn = "";
+    let rowClass = "";
 
     // 权限检测
-    let permIcon = '';
+    let permIcon = "";
     if (fileInfo.writable === false) {
-      warn += ' <span title="无写权限，跳过" style="color:#e87b00;font-size:1.1em;vertical-align:middle;">🔒</span>';
-      rowClass += 'file-row-readonly ';
+      warn +=
+        ' <span title="无写权限，跳过" style="color:#e87b00;font-size:1.1em;vertical-align:middle;">🔒</span>';
+      rowClass += "file-row-readonly ";
     }
 
     // 冲突或非法字符警告
     if (fileInfo.hasConflict) {
       warn += ' <span style="color:#c00;font-size:0.9em;">(重名冲突)</span>';
-      rowClass += 'file-row-conflict ';
+      rowClass += "file-row-conflict ";
     } else if (fileInfo.invalidChar) {
       warn += ' <span style="color:#c00;font-size:0.9em;">(非法字符)</span>';
-      rowClass += 'file-row-invalid ';
+      rowClass += "file-row-invalid ";
     }
 
     // 行内容
-    let row = document.createElement('tr');
+    let row = document.createElement("tr");
     row.innerHTML = `
       <th scope="row">${index + 1}</th>
       <td>${fileInfo.name}</td>
-      <td class="preview-cell ${hasChange ? "preview-highlight" : "dimmed"}" style="font-family:monospace;">
-        ${fileInfo.newPath || '(无变化)'} ${warn}
+      <td class="preview-cell ${
+        hasChange ? "preview-highlight" : "dimmed"
+      }" style="font-family:monospace;">
+        ${fileInfo.newPath || "(无变化)"} ${warn}
       </td>
     `;
     row.className = rowClass.trim();
@@ -460,10 +482,10 @@ function setupTabSwitching() {
       if (tabContent) {
         tabContent.classList.add("active");
       }
-      
+
       updatePreview();
-      console.log('Tab switched to:', tabId);
-      document.dispatchEvent(new Event('refresh-apply'));
+      console.log("Tab switched to:", tabId);
+      document.dispatchEvent(new Event("refresh-apply"));
     });
   });
 
@@ -486,23 +508,26 @@ function setupRealTimePreview() {
   // 位置单选框
   positionRadios.forEach((radio) => {
     radio.addEventListener("change", (e) => {
-      console.log('[sequence] position changed to:', e.target && e.target.value);
+      console.log(
+        "[sequence] position changed to:",
+        e.target && e.target.value
+      );
       updatePreview();
-      document.dispatchEvent(new Event('refresh-apply'));
+      document.dispatchEvent(new Event("refresh-apply"));
     });
   });
-
 
   // 大小写转换（改为单选组）
-  const caseRadios = document.querySelectorAll('#tab-case input[name="caseType"]');
-  caseRadios.forEach(r => {
-    r.addEventListener('change', (e) => {
-      console.log('[case] caseType changed to:', e.target && e.target.value);
+  const caseRadios = document.querySelectorAll(
+    '#tab-case input[name="caseType"]'
+  );
+  caseRadios.forEach((r) => {
+    r.addEventListener("change", (e) => {
+      console.log("[case] caseType changed to:", e.target && e.target.value);
       updatePreview();
-      document.dispatchEvent(new Event('refresh-apply'));
+      document.dispatchEvent(new Event("refresh-apply"));
     });
   });
-
 }
 
 // 检查冲突和非法字符
@@ -511,15 +536,15 @@ function checkForConflicts() {
   let hasAnyConflict = false;
 
   // 重置冲突和非法字符状态
-  loadedFiles.forEach(fileInfo => {
+  loadedFiles.forEach((fileInfo) => {
     fileInfo.hasConflict = false;
     fileInfo.invalidChar = false;
   });
 
-  loadedFiles.forEach(fileInfo => {
+  loadedFiles.forEach((fileInfo) => {
     if (fileInfo.newPath) {
       // 检查非法字符 (macOS 不允许 /)
-      if (fileInfo.newPath.includes('/') || fileInfo.newPath.includes(':')) {
+      if (fileInfo.newPath.includes("/") || fileInfo.newPath.includes(":")) {
         fileInfo.invalidChar = true;
         hasAnyConflict = true;
       }
@@ -543,8 +568,8 @@ function updatePreview() {
   if (loadedFiles.length === 0) return;
 
   // 1. 更新所有文件的预览名称
-  loadedFiles.forEach(fileInfo => {
-    fileInfo.newPath = getPreviewName(fileInfo.name);
+  loadedFiles.forEach((fileInfo, index) => {
+    fileInfo.newPath = getPreviewName(fileInfo.name, false, index);
   });
 
   // 2. 检查冲突和非法字符
@@ -580,7 +605,7 @@ function updatePreview() {
   setupButtonEvents.refreshApplyButton();
 }
 
-function getPreviewName(fileName, withHighlight = false) {
+function getPreviewName(fileName, withHighlight = false, fileIndex = 0) {
   const activeTab = document.querySelector(".tab-content.active");
   if (!activeTab) return fileName;
   const tabId = activeTab.id;
@@ -588,23 +613,29 @@ function getPreviewName(fileName, withHighlight = false) {
     case "tab-replace":
       return getPreviewForReplace(fileName, withHighlight);
     case "tab-sequence":
-      return getPreviewForSequence(fileName, withHighlight);
+      return getPreviewForSequence(fileName, withHighlight, fileIndex);
     case "tab-case": {
-      const checked = document.querySelector('#tab-case input[name="caseType"]:checked');
+      const checked = document.querySelector(
+        '#tab-case input[name="caseType"]:checked'
+      );
       if (!checked) return fileName;
       const val = checked.value; // 'upper' | 'lower' | 'capitalize'
       let newName = fileName;
-      if (val === 'lower') newName = fileName.toLowerCase();
-      else if (val === 'upper') newName = fileName.toUpperCase();
-      else if (val === 'capitalize') newName = fileName.replace(/(^|[^a-zA-Z])([a-z])/g, (m, pre, char) => pre + char.toUpperCase());
+      if (val === "lower") newName = fileName.toLowerCase();
+      else if (val === "upper") newName = fileName.toUpperCase();
+      else if (val === "capitalize")
+        newName = fileName.replace(
+          /(^|[^a-zA-Z])([a-z])/g,
+          (m, pre, char) => pre + char.toUpperCase()
+        );
       if (withHighlight && newName !== fileName) {
         // 高亮变化部分
-        let html = '';
+        let html = "";
         for (let i = 0; i < newName.length; i++) {
           if (fileName[i] !== newName[i]) {
-            html += `<span class='highlight'>${newName[i] || ''}</span>`;
+            html += `<span class='highlight'>${newName[i] || ""}</span>`;
           } else {
-            html += newName[i] || '';
+            html += newName[i] || "";
           }
         }
         return html;
@@ -625,16 +656,27 @@ function getPreviewForReplace(fileName) {
   return fileName.replace(new RegExp(findText, "g"), replaceText);
 }
 
-function getPreviewForSequence(fileName, withHighlight = false) {
+function getPreviewForSequence(fileName, withHighlight = false, fileIndex = 0) {
   const start = parseInt(startInput.value) || 1;
   const digits = parseInt(digitsInput.value) || 2;
-  const position = document.querySelector('input[name="position"]:checked').value;
-  const sequenceNumber = start.toString().padStart(digits, "0");
-  const fileExtension = fileName.includes(".") ? "." + fileName.split(".").pop() : "";
-  const fileNameWithoutExt = fileName.includes(".") ? fileName.substring(0, fileName.lastIndexOf(".")) : fileName;
-  let newName = position === "prefix"
-    ? `${sequenceNumber}_${fileName}`
-    : `${fileNameWithoutExt}_${sequenceNumber}${fileExtension}`;
+  const position = document.querySelector(
+    'input[name="position"]:checked'
+  ).value;
+
+  // 为每个文件计算不同的序列号
+  const currentSequenceNumber = start + fileIndex;
+  const sequenceNumber = currentSequenceNumber.toString().padStart(digits, "0");
+
+  const fileExtension = fileName.includes(".")
+    ? "." + fileName.split(".").pop()
+    : "";
+  const fileNameWithoutExt = fileName.includes(".")
+    ? fileName.substring(0, fileName.lastIndexOf("."))
+    : fileName;
+  let newName =
+    position === "prefix"
+      ? `${sequenceNumber}_${fileName}`
+      : `${fileNameWithoutExt}_${sequenceNumber}${fileExtension}`;
   if (!withHighlight || newName === fileName) return newName;
   // 高亮序列号部分
   if (position === "prefix") {
@@ -655,30 +697,53 @@ function setupButtonEvents() {
   if (redoBtn) redoBtn.disabled = true;
   // 根据规则配置与文件列表使能“执行重命名”
   function refreshApplyButton() {
-    const applyBtnEl = document.getElementById('apply-rename');
-    const activeTab = document.querySelector('.tab-content.active');
+    const applyBtnEl = document.getElementById("apply-rename");
+    const activeTab = document.querySelector(".tab-content.active");
     const hasFiles = loadedFiles && loadedFiles.length > 0;
     let valid = false;
-    if (activeTab && activeTab.id === 'tab-replace') {
+    if (activeTab && activeTab.id === "tab-replace") {
       valid = !!(findInput && findInput.value);
-    } else if (activeTab && activeTab.id === 'tab-sequence') {
-      valid = !!(startInput && startInput.value && digitsInput && digitsInput.value);
-    } else if (activeTab && activeTab.id === 'tab-case') {
-      valid = !!document.querySelector('#tab-case input[name="caseType"]:checked');
+    } else if (activeTab && activeTab.id === "tab-sequence") {
+      valid = !!(
+        startInput &&
+        startInput.value &&
+        digitsInput &&
+        digitsInput.value
+      );
+    } else if (activeTab && activeTab.id === "tab-case") {
+      valid = !!document.querySelector(
+        '#tab-case input[name="caseType"]:checked'
+      );
     }
     // 检查是否有任何文件存在冲突或非法字符
-    const hasAnyConflictOrInvalidChar = loadedFiles.some(fileInfo => fileInfo.hasConflict || fileInfo.invalidChar);
+    const hasAnyConflictOrInvalidChar = loadedFiles.some(
+      (fileInfo) => fileInfo.hasConflict || fileInfo.invalidChar
+    );
 
-    if (applyBtnEl) applyBtnEl.disabled = !(hasFiles && valid && !hasAnyConflictOrInvalidChar);
+    if (applyBtnEl)
+      applyBtnEl.disabled = !(
+        hasFiles &&
+        valid &&
+        !hasAnyConflictOrInvalidChar
+      );
   }
 
   // 绑定输入变化以刷新按钮状态
-  [findInput, replaceInput, startInput, digitsInput].forEach(el => el && el.addEventListener('input', refreshApplyButton));
-  positionRadios && positionRadios.forEach(r => r.addEventListener('change', refreshApplyButton));
-  const caseRadiosForBtn = document.querySelectorAll('#tab-case input[name="caseType"]');
-  caseRadiosForBtn.forEach(r => r.addEventListener('change', refreshApplyButton));
+  [findInput, replaceInput, startInput, digitsInput].forEach(
+    (el) => el && el.addEventListener("input", refreshApplyButton)
+  );
+  positionRadios &&
+    positionRadios.forEach((r) =>
+      r.addEventListener("change", refreshApplyButton)
+    );
+  const caseRadiosForBtn = document.querySelectorAll(
+    '#tab-case input[name="caseType"]'
+  );
+  caseRadiosForBtn.forEach((r) =>
+    r.addEventListener("change", refreshApplyButton)
+  );
   // 允许外部触发刷新（如Tab切换）
-  document.addEventListener('refresh-apply', refreshApplyButton);
+  document.addEventListener("refresh-apply", refreshApplyButton);
 
   // 撤销按钮事件
   if (undoRenameButton) {
@@ -689,7 +754,7 @@ function setupButtonEvents() {
           showErrorMsg("已撤销上一步重命名", true);
           // 撤销成功后，需要从 undoStack 弹出，并推入 redoStack
           if (undoStack.length > 0) {
-            redoStack.push(loadedFiles.map(f => ({...f}))); // 当前状态推入 redoStack
+            redoStack.push(loadedFiles.map((f) => ({ ...f }))); // 当前状态推入 redoStack
             loadedFiles = undoStack.pop(); // 恢复上一个状态
             updateFileTable();
             updateFileCount();
@@ -714,7 +779,7 @@ function setupButtonEvents() {
           showErrorMsg("已重做重命名", true);
           // 重做成功后，需要从 redoStack 弹出，并推入 undoStack
           if (redoStack.length > 0) {
-            undoStack.push(loadedFiles.map(f => ({...f}))); // 当前状态推入 undoStack
+            undoStack.push(loadedFiles.map((f) => ({ ...f }))); // 当前状态推入 undoStack
             loadedFiles = redoStack.pop(); // 恢复重做后的状态
             updateFileTable();
             updateFileCount();
@@ -729,7 +794,6 @@ function setupButtonEvents() {
       }
     });
   }
-
 
   // 清空按钮
   clearAllButton.addEventListener("click", () => {
@@ -783,7 +847,9 @@ function setupButtonEvents() {
         };
         break;
       case "case": {
-        const checked = document.querySelector('#tab-case input[name="caseType"]:checked');
+        const checked = document.querySelector(
+          '#tab-case input[name="caseType"]:checked'
+        );
         const caseType = checked ? checked.value : "";
         ruleData = { caseType };
         break;
@@ -802,9 +868,14 @@ function setupButtonEvents() {
 
 // 调用 Tauri 后端执行重命名
 async function executeRename(filePaths, activeTabId, ruleData) {
+  console.log("🚀 [前端日志] 开始执行重命名");
+  console.log("🚀 [前端日志] 文件路径:", filePaths);
+  console.log("🚀 [前端日志] 激活选项卡:", activeTabId);
+  console.log("🚀 [前端日志] 规则数据:", ruleData);
+
   // 操作前快照入undo栈，清空redo栈
   if (loadedFiles.length > 0) {
-    undoStack.push(loadedFiles.map(f => ({...f})));
+    undoStack.push(loadedFiles.map((f) => ({ ...f })));
     redoStack = [];
     updateUndoRedoButtons();
     saveHistory();
@@ -829,8 +900,12 @@ async function executeRename(filePaths, activeTabId, ruleData) {
   }
 
   // 跳过无写权限文件
-  const filesToRename = loadedFiles.filter(f => filePaths.includes(f.path) && f.writable !== false);
-  const skippedFiles = loadedFiles.filter(f => filePaths.includes(f.path) && f.writable === false);
+  const filesToRename = loadedFiles.filter(
+    (f) => filePaths.includes(f.path) && f.writable !== false
+  );
+  const skippedFiles = loadedFiles.filter(
+    (f) => filePaths.includes(f.path) && f.writable === false
+  );
   if (skippedFiles.length > 0) {
     showErrorMsg(`${skippedFiles.length} 个文件因无写权限被跳过`, false);
   }
@@ -859,11 +934,17 @@ async function executeRename(filePaths, activeTabId, ruleData) {
         caseType: ruleData.caseType, // "upper" | "lower" | "capitalize"
       };
     }
+
+    console.log("🚀 [前端日志] 构建的后端规则:", backendRule);
+    console.log("🚀 [前端日志] 即将调用 invoke('execute_rename')");
+
     const result = await invoke("execute_rename", {
       filePaths: filePaths,
       rule: backendRule,
     });
-    console.log("重命名结果:", result);
+
+    console.log("🚀 [前端日志] 后端返回结果:", result);
+
     if (result.success) {
       if (result.renamed_count > 0) {
         showErrorMsg(`成功重命名 ${result.renamed_count} 个文件`, true);
@@ -885,7 +966,8 @@ async function executeRename(filePaths, activeTabId, ruleData) {
       showErrorMsg(`重命名失败: ${result.error_message || "未知错误"}`);
     }
   } catch (error) {
-    console.error("调用后端失败:", error);
+    console.error("❌ [前端日志] 调用后端失败:", error);
+    console.error("❌ [前端日志] 错误详情:", error.message);
     showErrorMsg("执行重命名时发生错误: " + error.message);
   }
 }
