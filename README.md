@@ -1,92 +1,124 @@
-# ReName
+# ReNameTool
 
-一个基于 Tauri 的桌面应用程序。
+一个强大、直观且高效的批量文件重命名工具，基于 Tauri 框架和 Rust 语言构建。
 
-## 项目简介
+## 简介
 
-ReName 是使用 Tauri 框架开发的跨平台桌面应用，结合了 Web 前端技术和 Rust 后端的优势。
+ReNameTool 旨在提供一个用户友好的界面，帮助您轻松地对大量文件进行批量重命名。无论是简单的查找替换，还是复杂的序列化、大小写转换，ReNameTool 都能满足您的需求，极大地提高文件管理的效率。
 
-## 开发计划与升级计划
+## 功能特性
 
-### 阶段划分
-
-#### 阶段一：核心布局与交互重构（高优先级）
-- [ ] 1.1 设计并实现一体化单屏工作台主界面
-- [ ] 1.2 文件批量导入与展示（拖拽/选择）
-- [ ] 1.3 文件重命名规则预览与编辑
-- [ ] 1.4 重命名结果预览与冲突检测
-- [ ] 1.5 核心重命名功能实现（调用 Rust/Tauri 后端）
-- [ ] 1.6 基础操作按钮（重命名、撤销、重置等）
-
-#### 阶段二：健壮性与体验优化（中优先级）
-- [ ] 2.1 错误处理与用户提示优化
-- [ ] 2.2 文件类型与权限兼容性增强
-- [ ] 2.3 操作历史记录与撤销重做
-- [ ] 2.4 多语言支持（中英文）
-
-#### 阶段三：进阶功能与效率提升（长期价值）
-- [ ] 3.1 高级重命名规则（正则/模板/批量规则）
-- [ ] 3.2 文件/文件夹混合处理
-- [ ] 3.3 自定义插件机制
-- [ ] 3.4 高级批处理性能优化
-- [ ] 3.5 自动化脚本支持
-
-### 升级计划
-- 逐步替换旧版分离式页面为一体化单屏工作台
-- 每完成一个阶段性小任务，进行 git commit 记录
-- 详细记录每次升级内容、bug 修复与新特性
-
-### 开发流程建议
-1. 选择当前阶段的第一个未完成任务
-2. 开发并自测该功能
-3. 完成后进行 git commit，备注功能点
-4. 进入下一个任务
-
-### 任务推进建议
-建议每完成一个小功能（如1.1、1.2等），就用如下格式进行 git 提交：
-
-```
-git add .
-git commit -m "feat: 完成一体化主界面基础布局"
-```
+*   **直观的用户界面**：简洁明了的设计，易于上手。
+*   **多种重命名规则**：支持查找替换、序列化、大小写转换等多种高级重命名模式。
+*   **实时预览**：在应用更改前，实时查看重命名效果，避免错误。
+*   **跨平台支持**：基于 Tauri，可打包为 Mac 和 Windows 桌面应用。
+*   **高性能**：底层使用 Rust 编写，确保重命名操作的快速与高效。
 
 ## 技术栈
 
-- **前端：** HTML, CSS, JavaScript, Vite
-- **后端：** Rust (Tauri)
-- **构建工具：** Vite, Cargo
+*   **前端**：HTML, CSS, JavaScript (请根据实际使用的前端框架填写，例如：Vue/React/Svelte)
+*   **后端/桌面框架**：Tauri
+*   **核心逻辑**：Rust
 
-## 开发环境设置
+## 安装与运行
 
-### 前置要求
+### 从发布版本安装
 
-- Node.js (推荐 LTS 版本)
-- Rust (最新稳定版)
-- Tauri CLI
+请前往 [GitHub Releases](https://github.com/YOUR_USERNAME/YOUR_REPOSITORY_NAME/releases) 下载最新版本的安装包，然后按照指引进行安装。
 
-### 安装依赖
+### 从源代码构建
+
+如果您希望从源代码构建和运行 ReNameTool，请确保您的系统已安装以下依赖：
+
+*   [Rust](https://www.rust-lang.org/tools/install)
+*   [Node.js](https://nodejs.org/en/download/) (推荐 LTS 版本)
+*   [Tauri CLI](https://tauri.app/v1/guides/getting-started/prerequisites)
+
+1.  **克隆仓库**：
+    ```bash
+    git clone https://github.com/YOUR_USERNAME/YOUR_REPOSITORY_NAME.git
+    cd ReNameTool
+    ```
+
+2.  **安装前端依赖**：
+    ```bash
+    npm install # 或 yarn install
+    ```
+
+3.  **运行开发模式**：
+    ```bash
+    npm run tauri dev # 或 yarn tauri dev
+    ```
+
+### 打包发布版本
+
+要为不同平台构建发布版本，您可以使用 `npm run tauri build` 命令。Tauri 会根据您的操作系统和配置，自动生成适用于该平台的安装包。
+
+**通用构建命令：**
 
 ```bash
-# 安装前端依赖
-npm install
-
-# 安装 Tauri CLI (如果尚未安装)
-npm install -g @tauri-apps/cli
-```
-
-### 开发模式
-
-```bash
-# 启动开发服务器
-npm run tauri dev
-```
-
-### 构建生产版本
-
-```bash
-# 构建应用
 npm run tauri build
 ```
+
+**特定平台构建命令及包类型：**
+
+*   **macOS (Intel Mac / Apple Silicon Mac)**
+    *   **命令：**
+        *   通用二进制 (同时支持 Intel 和 Apple Silicon):
+            ```bash
+            npm run tauri build -- --target universal-apple-darwin
+            ```
+        *   仅 Apple Silicon (M1/M2/M3):
+            ```bash
+            npm run tauri build -- --target aarch64-apple-darwin
+            ```
+        *   仅 Intel (x86_64):
+            ```bash
+            npm run tauri build -- --target x86_64-apple-darwin
+            ```
+    *   **包类型：**
+        *   `.dmg` (磁盘映像文件，macOS 安装包)
+        *   `.app` (应用程序包，可直接运行)
+    *   **输出位置示例：**
+        ```
+        src-tauri/target/universal-apple-darwin/release/bundle/dmg/your_app_name_version_universal.dmg
+        src-tauri/target/aarch64-apple-darwin/release/bundle/dmg/your_app_name_version_aarch64.dmg
+        src-tauri/target/x86_64-apple-darwin/release/bundle/dmg/your_app_name_version_x86_64.dmg
+        ```
+
+*   **Windows (x64)**
+    *   **命令：**
+        ```bash
+        npm run tauri build -- --target x86_64-pc-windows-msvc
+        # 或 npm run tauri build (如果在 Windows 系统上运行，默认会构建 Windows 包)
+        ```
+    *   **包类型：**
+        *   `.msi` (Microsoft Installer，Windows 安装包)
+        *   `.exe` (可执行文件，通常在 `target/release` 目录下)
+    *   **输出位置示例：**
+        ```
+        src-tauri/target/x86_64-pc-windows-msvc/release/bundle/msi/your_app_name_version_x64.msi
+        src-tauri/target/x86_64-pc-windows-msvc/release/your_app_name.exe
+        ```
+    *   **重要提示：** 在非 Windows 系统上构建 Windows 包（交叉编译）通常需要额外的环境配置，如安装 MinGW-w64。推荐直接在 Windows 系统上进行构建，以简化流程。
+
+*   **Linux (x64)**
+    *   **命令：**
+        ```bash
+        npm run tauri build -- --target x86_64-unknown-linux-gnu
+        # 或 npm run tauri build (如果在 Linux 系统上运行，默认会构建 Linux 包)
+        ```
+    *   **包类型：**
+        *   `.AppImage` (自包含的 Linux 应用程序包)
+        *   `.deb` (Debian/Ubuntu 安装包)
+        *   `.rpm` (Fedora/CentOS 安装包)
+    *   **输出位置示例：**
+        ```
+        src-tauri/target/x86_64-unknown-linux-gnu/release/bundle/appimage/your_app_name_version_amd64.AppImage
+        src-tauri/target/x86_64-unknown-linux-gnu/release/bundle/deb/your_app_name_version_amd64.deb
+        ```
+
+**打包后的文件通常位于 `src-tauri/target/<target-triple>/release/bundle/` 目录下。**
 
 ## 项目结构
 
@@ -115,8 +147,13 @@ ReName/
 
 ## 许可证
 
-[添加许可证信息]
+本项目采用 [MIT 许可证](LICENSE) 发布。您可以在项目的 `LICENSE` 文件中查看更多详情。
 
 ## 联系方式
 
-[添加联系信息]
+如果您有任何问题或建议，欢迎通过以下方式联系我：
+
+*   GitHub Issues: [https://github.com/YOUR_USERNAME/YOUR_REPOSITORY_NAME/issues](https://github.com/YOUR_USERNAME/YOUR_REPOSITORY_NAME/issues)
+*   Email: [your_email@example.com](mailto:your_email@example.com)
+
+请将 `YOUR_USERNAME` 和 `YOUR_REPOSITORY_NAME` 替换为您的实际 GitHub 用户名和仓库名，并将 `your_email@example.com` 替换为您的电子邮件地址。
