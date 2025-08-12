@@ -1,0 +1,81 @@
+/* 系统主要色系 - 基于logo提取 */
+:root {
+  /* 主色调 - 橙黄色（左侧环） */
+  --color-primary: #F5B041;
+  --color-primary-rgb: 245, 176, 65;
+  --color-primary-light: #F7C573;
+  --color-primary-dark: #F39C12;
+
+  /* 次要色调 - 青绿色（右侧环） */
+  --color-secondary: #58D68D;
+  --color-secondary-rgb: 88, 214, 141;
+  --color-secondary-light: #7DCEA0;
+  --color-secondary-dark: #2ECC71;
+
+  /* 强调色 - 浅绿色（渐变色） */
+  --color-accent: #A9DFBF;
+  --color-accent-rgb: 169, 223, 191;
+  --color-accent-light: #D5F4E6;
+  --color-accent-dark: #82E0AA;
+
+  /* 背景色系 */
+  --color-background: #FFFFFF;
+  --color-background-rgb: 255, 255, 255;
+  --color-background-secondary: #F8F9FA;
+  --color-background-secondary-rgb: 248, 249, 250;
+
+  /* 中性色系 */
+  --color-neutral-50: #F8F9FA;
+  --color-neutral-100: #E9ECEF;
+  --color-neutral-200: #DEE2E6;
+  --color-neutral-300: #CED4DA;
+  --color-neutral-400: #ADB5BD;
+  --color-neutral-500: #6C757D;
+  --color-neutral-600: #495057;
+  --color-neutral-700: #343A40;
+  --color-neutral-800: #212529;
+  --color-neutral-900: #000000;
+
+  /* 语义化颜色 */
+  --color-success: var(--color-secondary);
+  --color-warning: var(--color-primary);
+  --color-info: var(--color-accent);
+  --color-error: #E74C3C;
+
+  /* 透明度变体 */
+  --color-primary-10: rgba(var(--color-primary-rgb), 0.1);
+  --color-primary-20: rgba(var(--color-primary-rgb), 0.2);
+  --color-primary-30: rgba(var(--color-primary-rgb), 0.3);
+  
+  --color-secondary-10: rgba(var(--color-secondary-rgb), 0.1);
+  --color-secondary-20: rgba(var(--color-secondary-rgb), 0.2);
+  --color-secondary-30: rgba(var(--color-secondary-rgb), 0.3);
+
+  --color-accent-10: rgba(var(--color-accent-rgb), 0.1);
+  --color-accent-20: rgba(var(--color-accent-rgb), 0.2);
+  --color-accent-30: rgba(var(--color-accent-rgb), 0.3);
+}
+
+/* 深色主题变体 */
+@media (prefers-color-scheme: dark) {
+  :root {
+    --color-background: #1A1A1A;
+    --color-background-secondary: #2D2D2D;
+    --color-neutral-50: #2D2D2D;
+    --color-neutral-100: #404040;
+    --color-neutral-200: #525252;
+  }
+}
+
+/* 实用类 */
+.text-primary { color: var(--color-primary); }
+.text-secondary { color: var(--color-secondary); }
+.text-accent { color: var(--color-accent); }
+
+.bg-primary { background-color: var(--color-primary); }
+.bg-secondary { background-color: var(--color-secondary); }
+.bg-accent { background-color: var(--color-accent); }
+
+.border-primary { border-color: var(--color-primary); }
+.border-secondary { border-color: var(--color-secondary); }
+.border-accent { border-color: var(--color-accent); }

@@ -1,0 +1,52 @@
+{
+  "primary": {
+    "name": "橙黄色",
+    "hex": "#F5B041",
+    "rgb": {
+      "r": 245,
+      "g": 176,
+      "b": 65
+    },
+    "description": "左侧环的主色调"
+  },
+  "secondary": {
+    "name": "青绿色",
+    "hex": "#58D68D",
+    "rgb": {
+      "r": 88,
+      "g": 214,
+      "b": 141
+    },
+    "description": "右侧环的主色调"
+  },
+  "accent": {
+    "name": "浅绿色",
+    "hex": "#A9DFBF",
+    "rgb": {
+      "r": 169,
+      "g": 223,
+      "b": 191
+    },
+    "description": "环的渐变色"
+  },
+  "background": {
+    "name": "纯白色",
+    "hex": "#FFFFFF",
+    "rgb": {
+      "r": 255,
+      "g": 255,
+      "b": 255
+    },
+    "description": "背景和中心区域"
+  },
+  "neutral": {
+    "name": "浅灰色",
+    "hex": "#F8F9FA",
+    "rgb": {
+      "r": 248,
+      "g": 249,
+      "b": 250
+    },
+    "description": "辅助背景色"
+  }
+}
