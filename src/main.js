@@ -89,7 +89,30 @@ function setupSelectionAndSorting() {
       updateFileTable();
       // 序列号预览依赖顺序
       updatePreview();
+      updateSortIndicators();
     });
+  });
+
+  // 初始化一次指示
+  updateSortIndicators();
+}
+
+// 更新表头排序箭头（▲/▼）
+function updateSortIndicators() {
+  const map = [
+    { id: 'th-name', label: '原文件名', key: 'name' },
+    { id: 'th-ext', label: '扩展名', key: 'extension' },
+    { id: 'th-size', label: '大小', key: 'size' },
+    { id: 'th-time', label: '修改时间', key: 'modified_ms' },
+  ];
+  map.forEach(({ id, label, key }) => {
+    const el = document.getElementById(id);
+    if (!el) return;
+    if (sortKey === key) {
+      el.textContent = `${label} ${sortAsc ? '▲' : '▼'}`;
+    } else {
+      el.textContent = label;
+    }
   });
 }
   // 常见错误归纳
@@ -1115,6 +1138,21 @@ function setupButtonEvents() {
     clearTable();
     updateFileCount();
 
+    // 重置全选复选框
+    const selectAllEl = document.getElementById('select-all');
+    if (selectAllEl) {
+      selectAllEl.checked = false;
+      selectAllEl.indeterminate = false;
+    }
+
+    // 重置排序状态
+    sortKey = null;
+    sortAsc = true;
+    lastSelectedIndex = -1;
+    if (typeof updateSortIndicators === 'function') {
+      updateSortIndicators();
+    }
+
     // 清空所有输入框
     findInput.value = "";
     replaceInput.value = "";
@@ -1126,6 +1164,11 @@ function setupButtonEvents() {
 
 
     saveHistory();
+
+    // 重置状态栏
+    if (typeof window.updateStatusBar === 'function') {
+      try { window.updateStatusBar({ total: 0, selected: 0, success: 0, failed: 0, message: "" }); } catch (_) {}
+    }
   });
 
   // 执行重命名按钮
