@@ -180,20 +180,7 @@ struct FileMetadata {
     permissions: FilePermissions,
 }
 
-#[derive(Serialize, Deserialize, Debug)]
-#[serde(tag = "type")]
-pub enum RenameRule {
-    #[serde(rename = "replace")]
-    Replace { find: String, replace: String },
-    #[serde(rename = "sequence")]
-    Sequence { start: usize, digits: usize, position: String },
-    #[serde(rename = "slice")]
-    Slice { start_index: usize, end_index: Option<usize>, replace_with: String },
-    #[serde(rename = "case")]
-    Case { #[serde(rename = "caseType")] case_type: String },
-    #[serde(rename = "extension")]
-    Extension { new_extension: String, keep_original: bool },
-}
+// RenameRule 定义见下文“规则系统（v3.0 覆盖）”节，避免重复定义
 
 #[derive(Serialize, Deserialize, Debug)]
 pub enum FileStatus {
