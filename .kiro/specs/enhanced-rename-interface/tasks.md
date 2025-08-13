@@ -8,7 +8,7 @@
  - 追踪约定：本文件任务项与 `requirements.md` 的需求编号、`design.md` 的设计项一一映射
  - 提交约定：遵循全局 Git 提交规则（完成每个任务点后立即 commit，使用规范信息格式），不在本文件重复提示。
 
-- [ ] 1. 构建基础布局骨架（Toolbar/Sidebar/RulePanel/Preview/StatusBar）
+- [x] 1. 构建基础布局骨架（Toolbar/Sidebar/RulePanel/Preview/StatusBar）
 
   - 实现顶部工具栏：标题与图标、开始重命名、清空列表、主题切换、全局设置入口
   - 左侧文件列表与右侧规则配置两栏布局，底部状态栏常驻
