@@ -6,7 +6,7 @@
 
 ### 来源与对齐声明
 
-- 主来源：`docs/01.prototype-v3-interface.md`（UI/交互/功能的最终依据）
+- 主来源：`docs/prototype-v3-interface.md`（UI/交互/功能的最终依据）
 - 辅来源：`docs/04.CHANGELOG.md` 与 `docs/archive/ROADMAP-v3.0.md`（用于补充阶段目标、性能指标与技术约束）
 - 冲突处理：若与辅来源不一致，一律以原型文档为准
 - 追踪约定：本文件中的设计项与 `requirements.md` 的需求编号、`tasks.md` 的任务编号一一映射
