@@ -150,8 +150,49 @@ re_name/
 ├── index.html             # 主页面
 ├── script.js              # 主要 JavaScript 逻辑
 ├── package.json           # Node.js 依赖
-└── vite.config.ts         # Vite 配置
+ └── vite.config.ts         # Vite 配置
 ```
+
+## 文档结构与用途说明
+
+ - 总览入口（导航与索引）
+   - `docs/00.INDEX.md`：列出下述所有文档及用途，作为团队入口页。
+
+ - 当前唯一真源（UI/交互/功能）
+   - 当前版本文件：`docs/01.prototype-v3-interface.md`
+   - 稳定别名：`docs/prototype-v3-interface.md`（所有引用统一指向此别名；切换版本时仅更新别名指向）
+   - 规则：任意内容若与原型冲突，一律以此为准（通过别名定位当前版本原型）。
+   - 归档：旧版本去掉 `01.` 前缀并移入 `docs/archive/`
+
+ - 规范三件套（仅记录“已确认内容”）
+   - `/.kiro/specs/<topic-slug>/requirements.md`：需求规范（用户故事、验收标准）。
+   - `/.kiro/specs/<topic-slug>/design.md`：技术设计（架构/接口/约束/测试策略）。
+   - `/.kiro/specs/<topic-slug>/tasks.md`：实现任务与验收（映射需求编号，结尾带提交提醒）。
+   - 约束：不得写“未确认的想法/规划”，此类内容请写到下述入口。
+   - 注意：`/.kiro/specs/` 为 Kiro 专用读取目录，禁止移动/重命名该目录。
+
+ - 问题与未来规划（未确认内容的唯一入口）
+   - `docs/02.issues.md`：问题清单（Bug/体验问题/风险/待澄清事项）。
+   - `docs/03.backlog.md`：未来产品规划与想法（尚未确认/待评估）。
+   - 作用：集中未确认内容，避免污染规范三件套。
+
+ - 变更记录
+   - `docs/04.CHANGELOG.md`：所有对外可见的变更记录（发布说明/重要修复/特性）。
+
+ - 路线图（可选，默认归档）
+   - 默认归档为：`docs/archive/ROADMAP-*.md`。
+   
+ - AI 助手工作流（必须遵守）
+   1. 发现问题/想法：写入 `docs/02.issues.md` 或 `docs/03.backlog.md`。
+   2. 立项（进入规划）：在 `/.kiro/specs/` 下创建 `<topic-slug>/`，依次补齐 `requirements.md → design.md → tasks.md`。
+   3. 开发执行：严格按 tasks 执行；完成每一子任务即按“全局开发规则”提交一次 commit。
+   4. 收尾：更新 `docs/04.CHANGELOG.md`；关闭相关 `issues` 项；将 `03.backlog` 中对应条目标记为已纳入/完成。
+   5. 结构调整：如调整文档结构，需同步更新 `docs/00.INDEX.md`，并在 `/.kiro/specs/<topic-slug>/tasks.md` 增加维护任务。
+
+ - 命名与链接规范
+   - `<topic-slug>` 使用 kebab-case（例如：`enhanced-rename-interface`）。
+   - 在 `requirements.md`/`design.md`/`tasks.md` 开头保留“来源与对齐声明”（指向 prototype/issue/backlog 链接）。
+   - 任何移动/重命名需同步更新 README、`docs/00.INDEX.md` 与相关交叉引用，避免断链。
 
 ## 可用脚本
 
@@ -177,7 +218,7 @@ re_name/
 
 ## 版本历史
 
-查看 [CHANGELOG.md](CHANGELOG.md) 了解详细的版本更新记录。
+查看 [变更记录](docs/04.CHANGELOG.md) 了解详细的版本更新记录。
 
 ## 联系方式
 
@@ -188,3 +229,5 @@ re_name/
 ## 致谢
 
 感谢 [Tauri](https://tauri.app/) 团队提供的优秀框架，让跨平台桌面应用开发变得如此简单。
+
+感谢Windsurf、Cursor、Trae、Kiro等AI辅助编码助手的代码生成。

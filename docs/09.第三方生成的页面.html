@@ -1,0 +1,299 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>ReName — Prototype</title>
+  <style>
+    :root{
+      --bg:#0f1724;--card:#0b1220;--muted:#9aa4b2;--accent:#6ee7b7;--glass:rgba(255,255,255,0.03);
+      --glass-2:rgba(255,255,255,0.02);
+      font-family: Inter, ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial;
+    }
+    html,body{height:100%;margin:0;background:linear-gradient(180deg,#071022 0%, #0b1630 100%);color:#e6eef6}
+    .app{height:100vh;display:flex;flex-direction:column;gap:18px;padding:20px;box-sizing:border-box}
+    .topbar{display:flex;gap:12px;align-items:center}
+    .brand{display:flex;align-items:center;gap:12px}
+    .logo{width:44px;height:44px;border-radius:10px;background:linear-gradient(135deg,#7ce8c9,#4f46e5);display:flex;align-items:center;justify-content:center;font-weight:700;color:#062;box-shadow:0 6px 18px rgba(79,70,229,0.22)}
+    h1{font-size:16px;margin:0}
+    .controls{margin-left:auto;display:flex;gap:8px;align-items:center}
+    .btn{background:var(--glass);border:1px solid rgba(255,255,255,0.04);padding:8px 12px;border-radius:10px;cursor:pointer;font-weight:600}
+    .btn.primary{background:linear-gradient(90deg,#10b981,#06b6d4);color:#031018;border:none;box-shadow:0 8px 30px rgba(6,182,212,0.12)}
+    .layout{display:grid;grid-template-columns:420px 1fr;gap:16px;flex:1;min-height:0}
+    @media (max-width:1000px){.layout{grid-template-columns:1fr;}}
+    .panel{background:linear-gradient(180deg, rgba(255,255,255,0.02), transparent);border-radius:14px;padding:14px;box-shadow:0 6px 30px rgba(2,6,23,0.6);border:1px solid rgba(255,255,255,0.03)}
+
+    /* left column */
+    .rules{display:flex;flex-direction:column;gap:10px}
+    label{font-size:12px;color:var(--muted);}
+    input[type=text], select{width:100%;padding:10px;border-radius:8px;border:1px solid rgba(255,255,255,0.04);background:transparent;color:inherit}
+    .file-drop{height:120px;border-radius:10px;border:2px dashed rgba(255,255,255,0.04);display:flex;align-items:center;justify-content:center;flex-direction:column;gap:8px}
+    .small{font-size:13px;color:var(--muted)}
+    .row{display:flex;gap:8px}
+    .rules .section{background:var(--glass-2);padding:12px;border-radius:10px}
+
+    /* advanced */
+    .adv-trigger{display:flex;justify-content:space-between;align-items:center;gap:8px;cursor:pointer}
+    .chev{transition:transform .25s}
+    .adv{overflow:hidden;transition:height .3s,opacity .25s}
+
+    /* right column */
+    .file-area{display:flex;flex-direction:column;height:100%;min-height:0}
+    .toolbar{display:flex;align-items:center;gap:8px;margin-bottom:8px}
+    .search{flex:1}
+    .file-table{flex:1;overflow:auto;border-radius:10px;padding:6px;background:linear-gradient(180deg, rgba(255,255,255,0.01), rgba(255,255,255,0.005));}
+    table{width:100%;border-collapse:collapse;font-size:13px}
+    th,td{padding:10px 8px;text-align:left;white-space:nowrap}
+    th{position:sticky;top:0;background:linear-gradient(180deg, rgba(255,255,255,0.01), rgba(255,255,255,0.01));backdrop-filter:blur(6px);z-index:3}
+    tr{border-bottom:1px solid rgba(255,255,255,0.02)}
+    tr:hover{background:linear-gradient(90deg, rgba(255,255,255,0.012), transparent)}
+    .filename{max-width:420px;overflow:hidden;text-overflow:ellipsis}
+    .muted{color:var(--muted);font-size:12px}
+    .preview{font-weight:700}
+
+    /* footer controls pinned top via topbar mimic (we keep real topbar) */
+    .hint{font-size:12px;color:var(--muted)}
+  </style>
+</head>
+<body>
+  <div class="app">
+    <div class="topbar">
+      <div class="brand">
+        <div class="logo">Rn</div>
+        <div>
+          <h1>ReName — 高保真原型</h1>
+          <div class="muted">基于你的仓库（已读取）并加入现代化交互与实时预览</div>
+        </div>
+      </div>
+
+      <div class="controls">
+        <button class="btn" id="clearBtn">清空文件列表</button>
+        <button class="btn" id="previewBtn">导出预览 .csv</button>
+        <button class="btn primary" id="runBtn">执行重命名</button>
+      </div>
+    </div>
+
+    <div class="layout">
+      <!-- left column: rules -->
+      <div class="panel rules">
+        <div class="section">
+          <label>添加文件 / 文件夹</label>
+          <div class="file-drop" id="dropArea">
+            <div class="small">拖拽文件到此，或点击选择文件（示例环境会读取文件名、大小、时间）</div>
+            <input id="fileInput" type="file" webkitdirectory directory multiple style="opacity:0;height:0;width:0;position:absolute;left:-9999px">
+            <button class="btn" id="addBtn">添加文件</button>
+          </div>
+        </div>
+
+        <div class="section">
+          <label>重命名规则构建器（实时预览）</label>
+          <div style="display:flex;gap:8px;margin-bottom:8px">
+            <select id="ruleSelect">
+              <option value="sequence">序列 (001, 002)</option>
+              <option value="replace">查找并替换</option>
+              <option value="prepend">前缀</option>
+              <option value="append">后缀</option>
+              <option value="case">大小写</option>
+            </select>
+            <input id="ruleInput" type="text" placeholder="规则参数，例如: 新前缀, 查找文字->替换文字, 001" />
+          </div>
+          <div class="muted">规则会以从上到下的顺序依次应用（支持组合）。</div>
+
+          <div style="margin-top:10px">
+            <label>已添加规则（拖动可排序）</label>
+            <div id="ruleList" style="display:flex;flex-direction:column;gap:6px;margin-top:6px"></div>
+          </div>
+        </div>
+
+        <div class="section">
+          <div class="adv-trigger" id="advToggle">
+            <div>
+              <label>高级重命名选项</label>
+              <div class="muted">可选：正则、保留扩展名、时间戳格式等</div>
+            </div>
+            <div class="chev" id="chev">▾</div>
+          </div>
+          <div class="adv" id="advPanel" style="height:0;opacity:0">
+            <div style="display:flex;flex-direction:column;gap:8px;padding-top:10px">
+              <label><input type="checkbox" id="keepExt" checked> 保留扩展名</label>
+              <label><input type="checkbox" id="useRegex"> 使用正则（高级）</label>
+              <label>时间格式：<select id="timeFormat"><option value="YYYYMMDD">YYYYMMDD</option><option value="YYYY-MM-DD_hhmm">YYYY-MM-DD_hhmm</option></select></label>
+              <label>碰撞处理：<select id="collision"><option value="skip">跳过</option><option value="overwrite">覆盖</option><option value="suffix">添加序号(2)</option></select></label>
+            </div>
+          </div>
+        </div>
+
+        <div class="section">
+          <label>预览设置</label>
+          <div class="row" style="margin-top:8px">
+            <label style="flex:1"><input type="checkbox" id="showPreview" checked> 实时预览</label>
+            <label style="flex:1"><input type="checkbox" id="dryRun" checked> 模拟运行（不修改真实文件）</label>
+          </div>
+        </div>
+
+        <div class="section">
+          <label>建议 & 快捷键</label>
+          <div class="muted">1) 将常用规则保存为 Preset； 2) 双击文件名可单独编辑； 3) 支持导出预览 CSV； 4) 支持正则测试器侧栏。</div>
+        </div>
+      </div>
+
+      <!-- right column: file list & preview -->
+      <div class="panel file-area">
+        <div class="toolbar">
+          <input id="filterInput" class="search" placeholder="搜索文件名或扩展名" />
+          <div class="muted">排序:</div>
+          <select id="sortSelect">
+            <option value="name_asc">文件名 ↑</option>
+            <option value="name_desc">文件名 ↓</option>
+            <option value="size_desc">大小 ↓</option>
+            <option value="size_asc">大小 ↑</option>
+            <option value="mtime_desc">修改时间 ↓</option>
+            <option value="mtime_asc">修改时间 ↑</option>
+          </select>
+        </div>
+
+        <div class="file-table" id="fileTable">
+          <table>
+            <thead><tr><th style="width:32px">#</th><th>文件名</th><th>新文件名（预览）</th><th>扩展名</th><th>大小</th><th>修改时间</th></tr></thead>
+            <tbody id="filesBody"></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    // NOTE: prototype - operates on File-like objects in the browser and simulated metadata
+    const repoUrl = 'https://github.com/fendaabc/ReNameTool-ForMac';
+
+    // Data model
+    let files = []; // {id,name,ext,size,mtime,newName}
+    let rules = [];
+
+    // helpers
+    function extOf(name){const i=name.lastIndexOf('.');return i>=0?name.slice(i):''}
+    function baseOf(name){const i=name.lastIndexOf('.');return i>=0?name.slice(0,i):name}
+    function formatSize(n){if(n<1024) return n+' B'; if(n<1024*1024) return (n/1024).toFixed(1)+' KB'; return (n/1024/1024).toFixed(2)+' MB'}
+    function fmtDate(d){const dt=new Date(d);return dt.toLocaleString()}
+
+    // add demo files when nothing added
+    const demo = [
+      {name:'IMG_20250101_park.JPG',size:2344556,mtime:1688800000000},
+      {name:'project-proposal.docx',size:34567,mtime:1668800000000},
+      {name:'notes.txt',size:1234,mtime:1658800000000},
+      {name:'holiday-照片.png',size:456789,mtime:1678800000000}
+    ];
+
+    function ensureDemo(){if(files.length===0){demo.forEach((d,i)=>{files.push(makeFile(d));});renderFiles();}}
+    function makeFile(f){return {id:Math.random().toString(36).slice(2,9),name:f.name,ext:extOf(f.name),size:f.size||0,mtime:f.mtime||Date.now(),newName:f.name}} 
+
+    // render
+    function renderFiles(){
+      const tbody=document.getElementById('filesBody');tbody.innerHTML='';
+      const filter=document.getElementById('filterInput').value.toLowerCase();
+      const sort=document.getElementById('sortSelect').value;
+      let list=files.slice();
+      if(filter) list=list.filter(f=>f.name.toLowerCase().includes(filter)||f.ext.toLowerCase().includes(filter));
+      // sort
+      list.sort((a,b)=>{
+        switch(sort){
+          case 'name_asc': return a.name.localeCompare(b.name);
+          case 'name_desc': return b.name.localeCompare(a.name);
+          case 'size_asc': return a.size-b.size;
+          case 'size_desc': return b.size-a.size;
+          case 'mtime_asc': return a.mtime-b.mtime;
+          case 'mtime_desc': return b.mtime-a.mtime;
+        }
+      });
+
+      list.forEach((f,i)=>{
+        const tr=document.createElement('tr');
+        tr.innerHTML=`<td>${i+1}</td>
+          <td class="filename" title="${f.name}">${f.name}</td>
+          <td class="preview" title="${f.newName}">${f.newName}</td>
+          <td class="muted">${f.ext}</td>
+          <td class="muted">${formatSize(f.size)}</td>
+          <td class="muted">${fmtDate(f.mtime)}</td>`;
+        tbody.appendChild(tr);
+      });
+    }
+
+    // apply rules to compute newName
+    function applyRules(){
+      const keepExt = document.getElementById('keepExt').checked;
+      files.forEach(f=>{
+        let name = baseOf(f.name);
+        for(const r of rules){
+          if(r.type==='prepend'){name = r.value + name}
+          if(r.type==='append'){name = name + r.value}
+          if(r.type==='replace'){const [from,to]=r.value.split('->'); if(from!==undefined) name = name.split(from).join(to||'')}
+          if(r.type==='sequence'){const idx = (r.start + r.padIndex++).toString().padStart(r.pad,'0'); name = r.template.replace('{num}', idx).replace('{name}', name)}
+          if(r.type==='case'){ if(r.value==='upper') name = name.toUpperCase(); if(r.value==='lower') name = name.toLowerCase(); }
+        }
+        f.newName = keepExt? name + f.ext : name;
+      });
+      renderFiles();
+    }
+
+    // UI wireups
+    document.getElementById('addBtn').addEventListener('click',()=>document.getElementById('fileInput').click());
+    document.getElementById('fileInput').addEventListener('change',(e)=>{
+      const list = Array.from(e.target.files);
+      list.forEach(f=>files.push({id:Math.random().toString(36).slice(2,9),name:f.name,ext:extOf(f.name),size:f.size,mtime:f.lastModified,newName:f.name}));
+      applyRules();
+    });
+
+    // drag drop
+    const drop=document.getElementById('dropArea');
+    drop.addEventListener('dragover',e=>{e.preventDefault();drop.style.borderColor='rgba(255,255,255,0.12)'});
+    drop.addEventListener('dragleave',e=>{drop.style.borderColor='rgba(255,255,255,0.04)'});
+    drop.addEventListener('drop',e=>{e.preventDefault();drop.style.borderColor='rgba(255,255,255,0.04)';const list=Array.from(e.dataTransfer.files);list.forEach(f=>files.push({id:Math.random().toString(36).slice(2,9),name:f.name,ext:extOf(f.name),size:f.size,mtime:f.lastModified,newName:f.name}));applyRules();});
+
+    // rule add
+    document.getElementById('ruleSelect').addEventListener('change',()=>{
+      const sel=document.getElementById('ruleSelect').value;const inp=document.getElementById('ruleInput');
+      if(sel==='sequence') inp.placeholder='例如: template={name}_{num}, start=1, pad=3 -> 输入: {name}_{num}|1|3';
+      if(sel==='replace') inp.placeholder='例如: 查找->替换 -> 输入: old->new';
+      if(sel==='prepend') inp.placeholder='例如: 新前缀_';
+      if(sel==='append') inp.placeholder='例如: _v2';
+      if(sel==='case') inp.placeholder='upper 或 lower';
+    });
+
+    document.getElementById('ruleInput').addEventListener('keydown',e=>{if(e.key==='Enter'){addRule();}});
+    function addRule(){const t=document.getElementById('ruleSelect').value;const v=document.getElementById('ruleInput').value.trim();if(!v) return;let r={id:Math.random().toString(36).slice(2,9),type:t,value:v};
+      if(t==='sequence'){const parts=v.split('|');r.template=parts[0]||'{name}_{num}';r.start=parseInt(parts[1]||'1');r.pad=parseInt(parts[2]||'3');r.padIndex=0;}
+      if(t==='case'){r.value=v}
+      rules.push(r);renderRules();document.getElementById('ruleInput').value='';applyRules();}
+
+    function renderRules(){const el=document.getElementById('ruleList');el.innerHTML='';rules.forEach((r,i)=>{const d=document.createElement('div');d.style.display='flex';d.style.justifyContent='space-between';d.style.alignItems='center';d.style.padding='8px';d.style.borderRadius='8px';d.style.background='rgba(255,255,255,0.01)';d.innerHTML=`<div style="font-size:13px">${i+1}. <strong>${r.type}</strong> — <span class="muted">${r.value}</span></div><div style="display:flex;gap:6px"><button class="btn" data-idx="${i}" onclick="moveRule(${i},-1)">↑</button><button class="btn" data-idx="${i}" onclick="moveRule(${i},1)">↓</button><button class="btn" data-idx="${i}" onclick="delRule(${i})">删除</button></div>`;el.appendChild(d);});}
+    window.moveRule=(i,dir)=>{const j=i+dir;if(j<0||j>=rules.length) return;const x=rules[i];rules.splice(i,1);rules.splice(j,0,x);renderRules();applyRules();}
+    window.delRule=(i)=>{rules.splice(i,1);renderRules();applyRules();}
+
+    // advanced toggle
+    document.getElementById('advToggle').addEventListener('click',()=>{
+      const p=document.getElementById('advPanel');const c=document.getElementById('chev');
+      if(p.style.height==='0px' || p.style.height==='') {p.style.height='120px';p.style.opacity=1;c.style.transform='rotate(180deg)'} else {p.style.height='0';p.style.opacity=0;c.style.transform='rotate(0deg)'}
+    });
+
+    // interactions
+    document.getElementById('clearBtn').addEventListener('click',()=>{files=[];renderFiles();});
+    document.getElementById('runBtn').addEventListener('click',()=>{
+      const dry=document.getElementById('dryRun').checked; if(dry){alert('模拟运行：重命名预览已应用（不修改真实文件）');} else {alert('（原型）真实重命名将在桌面应用中执行。');}
+    });
+    document.getElementById('filterInput').addEventListener('input',()=>renderFiles());
+    document.getElementById('sortSelect').addEventListener('change',()=>renderFiles());
+
+    // preview export csv
+    document.getElementById('previewBtn').addEventListener('click',()=>{
+      const rows = ['original,new'];files.forEach(f=>rows.push(`"${f.name}","${f.newName}"`));
+      const blob=new Blob([rows.join('\n')],{type:'text/csv'});const url=URL.createObjectURL(blob);const a=document.createElement('a');a.href=url;a.download='rename-preview.csv';a.click();URL.revokeObjectURL(url);
+    });
+
+    // init
+    ensureDemo();applyRules();
+
+    // show repo mention in console
+    console.log('Prototype based on repo:', repoUrl);
+  </script>
+</body>
+</html>
