@@ -3,6 +3,95 @@ function showErrorMsg(msg, isSuccess = false) {
   if (typeof msg === "object" && msg !== null) {
     msg = msg.error_message || msg.message || JSON.stringify(msg);
   }
+
+// 选择与排序相关事件绑定
+function setupSelectionAndSorting() {
+  // 全选/取消全选
+  const selectAll = document.getElementById('select-all');
+  if (selectAll) {
+    selectAll.addEventListener('change', (e) => {
+      const checked = e.target.checked;
+      loadedFiles.forEach(f => f.selected = checked);
+      lastSelectedIndex = -1;
+      updateFileTable();
+    });
+  }
+
+  // 行内复选框与行点击 - 事件委托
+  if (!fileTable) fileTable = document.getElementById('file-table-body');
+  if (fileTable) {
+    // 复选框变更
+    fileTable.addEventListener('change', (e) => {
+      const target = e.target;
+      if (target && target.classList && target.classList.contains('row-select')) {
+        const idx = parseInt(target.getAttribute('data-index'));
+        if (!isNaN(idx) && loadedFiles[idx]) {
+          loadedFiles[idx].selected = !!target.checked;
+          lastSelectedIndex = idx;
+          // 仅同步状态栏和全选状态，避免整表重绘
+          try {
+            const selectedCount = loadedFiles.filter(f => f.selected).length;
+            if (typeof window.updateStatusBar === 'function') {
+              window.updateStatusBar({ total: loadedFiles.length, selected: selectedCount });
+            }
+            const selectAllEl = document.getElementById('select-all');
+            if (selectAllEl) {
+              selectAllEl.indeterminate = selectedCount > 0 && selectedCount < loadedFiles.length;
+              selectAllEl.checked = selectedCount > 0 && selectedCount === loadedFiles.length;
+            }
+          } catch (_) {}
+        }
+      }
+    });
+
+    // 行点击（支持Shift范围选择）
+    fileTable.addEventListener('click', (e) => {
+      const tr = e.target && e.target.closest('tr');
+      if (!tr) return;
+      // 避免点击复选框重复处理
+      if (e.target && e.target.classList && e.target.classList.contains('row-select')) return;
+
+      const idxStr = tr.getAttribute('data-index');
+      const idx = idxStr ? parseInt(idxStr) : NaN;
+      if (isNaN(idx) || !loadedFiles[idx]) return;
+
+      const baseState = !loadedFiles[idx].selected;
+      if (e.shiftKey && lastSelectedIndex >= 0 && lastSelectedIndex < loadedFiles.length) {
+        const [start, end] = [Math.min(lastSelectedIndex, idx), Math.max(lastSelectedIndex, idx)];
+        for (let i = start; i <= end; i++) {
+          loadedFiles[i].selected = baseState;
+        }
+      } else {
+        loadedFiles[idx].selected = baseState;
+      }
+      lastSelectedIndex = idx;
+      updateFileTable();
+    });
+  }
+
+  // 列表表头排序
+  const sortableHeaders = [
+    { id: 'th-name', key: 'name' },
+    { id: 'th-ext', key: 'extension' },
+    { id: 'th-size', key: 'size' },
+    { id: 'th-time', key: 'modified_ms' },
+  ];
+  sortableHeaders.forEach(({ id, key }) => {
+    const el = document.getElementById(id);
+    if (!el) return;
+    el.addEventListener('click', () => {
+      if (sortKey === key) {
+        sortAsc = !sortAsc;
+      } else {
+        sortKey = key;
+        sortAsc = true;
+      }
+      updateFileTable();
+      // 序列号预览依赖顺序
+      updatePreview();
+    });
+  });
+}
   // 常见错误归纳
   if (!isSuccess) {
     if (msg.includes("EACCES") || msg.includes("权限"))
@@ -107,7 +196,8 @@ window.setLoadedFiles = (files) => {
     writable: true,
     newPath: filePath.split(/[\\/]/).pop(),
     hasConflict: false,
-    invalidChar: false
+    invalidChar: false,
+    selected: false
   }));
   console.log("🔧 [main.js] loadedFiles已更新:", loadedFiles);
 };
@@ -152,6 +242,10 @@ let applyRenameButton;
 
 // 渲染控制与工具
 let renderToken = 0; // 用于中止过期的渲染任务
+// 排序与选择状态
+let sortKey = null; // 可为 'name' | 'extension' | 'size' | 'modified_ms'
+let sortAsc = true;
+let lastSelectedIndex = -1;
 
 function formatFileSize(bytes) {
   if (typeof bytes !== "number" || isNaN(bytes)) return "-";
@@ -330,6 +424,9 @@ function initializeEventListeners() {
 
   // Tauri 拖拽事件监听
   setupTauriDragDrop();
+
+  // 选择与排序事件
+  setupSelectionAndSorting();
 }
 
 // 文件处理相关
@@ -491,6 +588,7 @@ async function handleFilePathsWithFolders(paths) {
       newPath: undefined,
       hasConflict: false,
       invalidChar: false,
+      selected: false,
     })));
 
     // 渲染与统计
@@ -520,7 +618,11 @@ async function handleFilePathsWithFolders(paths) {
   } finally {
     if (fileCountElem) fileCountElem.textContent = loadingBackup;
     if (typeof window.updateStatusBar === "function") {
-      try { window.updateStatusBar(); } catch (_) {}
+      try {
+        const totalNow = loadedFiles.length;
+        const selectedNow = loadedFiles.filter(f => f.selected).length;
+        window.updateStatusBar({ total: totalNow, selected: selectedNow });
+      } catch (_) {}
     }
   }
 }
@@ -567,6 +669,25 @@ function updateFileTable() {
 
   const fileCountElem = document.getElementById("file-count");
 
+  // 依据当前排序设置进行排序
+  if (sortKey) {
+    const key = sortKey;
+    const asc = sortAsc ? 1 : -1;
+    loadedFiles.sort((a, b) => {
+      const va = a[key];
+      const vb = b[key];
+      if (key === 'size' || key === 'modified_ms') {
+        const na = typeof va === 'number' ? va : 0;
+        const nb = typeof vb === 'number' ? vb : 0;
+        return (na - nb) * asc;
+      }
+      // 字符串自然排序
+      const sa = (va || '').toString();
+      const sb = (vb || '').toString();
+      return sa.localeCompare(sb, undefined, { numeric: true, sensitivity: 'base' }) * asc;
+    });
+  }
+
   function renderBatch() {
     if (thisToken !== renderToken) return; // 过期
     const end = Math.min(index + batchSize, total);
@@ -591,7 +712,9 @@ function updateFileTable() {
       }
 
       const row = document.createElement("tr");
+      row.dataset.index = String(i);
       row.innerHTML = `
+        <td><input type="checkbox" class="row-select" data-index="${i}" ${fileInfo.selected ? "checked" : ""} /></td>
         <th scope="row">${i + 1}</th>
         <td>${fileInfo.name}</td>
         <td>${fileInfo.extension || ""}</td>
@@ -601,7 +724,7 @@ function updateFileTable() {
           ${fileInfo.newPath || "(无变化)"} ${warn}
         </td>
       `;
-      row.className = rowClass.trim();
+      row.className = (rowClass + (fileInfo.selected ? " selected-row" : "")).trim();
       frag.appendChild(row);
     }
     fileTable.appendChild(frag);
@@ -615,6 +738,18 @@ function updateFileTable() {
       requestAnimationFrame(renderBatch);
     } else {
       if (fileCountElem) fileCountElem.textContent = `已加载 ${total} 个文件`;
+      // 同步状态栏与“全选”勾选状态
+      try {
+        const selectedCount = loadedFiles.filter(f => f.selected).length;
+        if (typeof window.updateStatusBar === 'function') {
+          window.updateStatusBar({ total: loadedFiles.length, selected: selectedCount });
+        }
+        const selectAllEl = document.getElementById('select-all');
+        if (selectAllEl) {
+          selectAllEl.indeterminate = selectedCount > 0 && selectedCount < loadedFiles.length;
+          selectAllEl.checked = selectedCount > 0 && selectedCount === loadedFiles.length;
+        }
+      } catch (_) {}
       // 按钮状态更新由 setupButtonEvents.refreshApplyButton() 统一处理
     }
   }
@@ -1021,8 +1156,10 @@ function setupButtonEvents() {
       return;
     }
 
-    // 收集文件路径数组
-    const filePaths = loadedFiles.map((fileInfo) => fileInfo.path);
+    // 收集文件路径数组：若有选中项，则仅对选中项执行；否则对全部
+    const selectedItems = loadedFiles.filter(f => f.selected);
+    const targetItems = selectedItems.length > 0 ? selectedItems : loadedFiles;
+    const filePaths = targetItems.map((fileInfo) => fileInfo.path);
 
     // 收集当前激活选项卡和规则数据
     const activeTab = document.querySelector(".tab-content.active");
