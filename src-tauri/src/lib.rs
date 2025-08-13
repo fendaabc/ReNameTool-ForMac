@@ -62,6 +62,17 @@ struct FilePermission {
     writable: bool,
 }
 
+#[derive(Serialize, Deserialize, Debug)]
+struct FileDetail {
+    name: String,
+    path: String,
+    extension: Option<String>,
+    size: u64,
+    modified_ms: Option<u64>,
+    readable: bool,
+    writable: bool,
+}
+
 #[tauri::command]
 async fn list_files(paths: Vec<String>) -> Result<Vec<String>, String> {
     log_info!("🦀 [后端日志] list_files 被调用，路径: {:?}", paths);
@@ -95,6 +106,62 @@ async fn check_file_permission(path: String) -> Result<FilePermission, String> {
         readable,
         writable,
     })
+}
+
+#[tauri::command]
+async fn get_file_infos(paths: Vec<String>) -> Result<Vec<FileDetail>, String> {
+    log_info!("🦀 [后端日志] get_file_infos 被调用，数量: {}", paths.len());
+    let mut details: Vec<FileDetail> = Vec::new();
+
+    for p in paths {
+        let path = Path::new(&p);
+        if !(path.exists() && path.is_file()) {
+            continue;
+        }
+
+        let name = path
+            .file_name()
+            .and_then(|s| s.to_str())
+            .unwrap_or("")
+            .to_string();
+        let extension = path
+            .extension()
+            .and_then(|s| s.to_str())
+            .map(|s| s.to_string());
+
+        match fs::metadata(&path) {
+            Ok(md) => {
+                let size = md.len();
+                let modified_ms = md
+                    .modified()
+                    .ok()
+                    .and_then(|t| t.duration_since(std::time::UNIX_EPOCH).ok())
+                    .map(|d| d.as_millis() as u64);
+                let readonly = md.permissions().readonly();
+                let readable = !readonly; // 简化判断
+                let writable = !readonly; // 简化判断
+
+                details.push(FileDetail {
+                    name,
+                    path: p,
+                    extension,
+                    size,
+                    modified_ms,
+                    readable,
+                    writable,
+                });
+            }
+            Err(e) => {
+                log_error!(
+                    "🦀 [后端日志] 读取元数据失败: {} — {}",
+                    path.display(),
+                    e
+                );
+            }
+        }
+    }
+
+    Ok(details)
 }
 
 #[tauri::command]
@@ -397,7 +464,8 @@ pub fn run() {
             execute_rename, 
             get_files_from_paths, 
             list_files,
-            check_file_permission
+            check_file_permission,
+            get_file_infos
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
