@@ -150,6 +150,30 @@ let fileCountElement;
 let clearAllButton;
 let applyRenameButton;
 
+// 渲染控制与工具
+let renderToken = 0; // 用于中止过期的渲染任务
+
+function formatFileSize(bytes) {
+  if (typeof bytes !== "number" || isNaN(bytes)) return "-";
+  const units = ["B", "KB", "MB", "GB", "TB"];
+  let i = 0;
+  let num = bytes;
+  while (num >= 1024 && i < units.length - 1) {
+    num /= 1024;
+    i++;
+  }
+  return (i === 0 ? num : num.toFixed(1)) + " " + units[i];
+}
+
+function formatTime(ms) {
+  if (!ms) return "-";
+  try {
+    return new Date(ms).toLocaleString();
+  } catch (_) {
+    return "-";
+  }
+}
+
 // 安全获取DOM元素的函数
 function ensureElement(elementVar, elementId, elementName) {
   if (!elementVar) {
@@ -412,7 +436,7 @@ async function handleFilePathsWithFolders(paths) {
   let loadingBackup = "";
   if (fileCountElem) {
     loadingBackup = fileCountElem.textContent;
-    fileCountElem.textContent = "正在加载文件，请稍候...";
+    fileCountElem.textContent = "正在扫描文件，请稍候...";
   }
   let timeoutId = null;
   try {
@@ -429,35 +453,55 @@ async function handleFilePathsWithFolders(paths) {
     clearTimeout(timeoutId);
     if (timedOut) return;
 
-    // 权限检测：检查每个文件的读写权限
-    let checkedFiles = [];
+    // 去重与非法路径拦截（list_files 已只返回文件，这里主要做去重）
+    const existing = new Set(loadedFiles.map((f) => f.path));
+    const uniqueFiles = [];
+    let duplicateCount = 0;
     for (const f of files) {
-      try {
-        const perm = await invoke("check_file_permission", { path: f });
-        checkedFiles.push({
-          name: f.split(/[\\/]/).pop(),
-          path: f,
-          readable: perm.readable,
-          writable: perm.writable,
-        });
-      } catch (e) {
-        checkedFiles.push({
-          name: f.split(/[\\/]/).pop(),
-          path: f,
-          readable: false,
-          writable: false,
-        });
-      }
+      if (existing.has(f)) duplicateCount++;
+      else uniqueFiles.push(f);
     }
-    loadedFiles = checkedFiles;
+
+    if (uniqueFiles.length === 0) {
+      updateFileCount();
+      if (fileCountElem) {
+        fileCountElem.textContent = `已加载 ${loadedFiles.length} 个文件`;
+      }
+      if (duplicateCount > 0) {
+        showErrorMsg(`检测到 ${duplicateCount} 个重复路径，已忽略`);
+      }
+      return;
+    }
+
+    // 批量获取元数据与权限
+    if (fileCountElem) {
+      fileCountElem.textContent = `正在获取元数据（共 ${uniqueFiles.length} 个）...`;
+    }
+    const details = await invoke("get_file_infos", { paths: uniqueFiles });
+    // 合并到已加载文件
+    loadedFiles = loadedFiles.concat(details.map((d) => ({
+      name: d.name,
+      path: d.path,
+      extension: d.extension || "",
+      size: d.size,
+      modified_ms: d.modified_ms,
+      readable: d.readable,
+      writable: d.writable,
+      // 预留前端计算字段
+      newPath: undefined,
+      hasConflict: false,
+      invalidChar: false,
+    })));
+
+    // 渲染与统计
     updateFileTable();
     updateFileCount();
 
     updatePreview();
     // 只显示文件数量统计
-    const fileCountElem = document.getElementById("file-count");
-    if (fileCountElem) {
-      fileCountElem.textContent = `已加载 ${loadedFiles.length} 个文件`;
+    const fileCountElem2 = document.getElementById("file-count");
+    if (fileCountElem2) {
+      fileCountElem2.textContent = `已加载 ${loadedFiles.length} 个文件`;
     }
     // 空状态提示行显示/隐藏
     const emptyRow = document.getElementById("empty-tip-row");
@@ -467,11 +511,17 @@ async function handleFilePathsWithFolders(paths) {
     if (loadedFiles.length === 0) {
       showErrorMsg("未检测到可导入的文件。");
     }
+    if (duplicateCount > 0) {
+      showErrorMsg(`检测到 ${duplicateCount} 个重复路径，已忽略`);
+    }
   } catch (error) {
     console.error("处理文件路径失败:", error);
     showErrorMsg("处理文件路径失败: " + error.message);
   } finally {
     if (fileCountElem) fileCountElem.textContent = loadingBackup;
+    if (typeof window.updateStatusBar === "function") {
+      try { window.updateStatusBar(); } catch (_) {}
+    }
   }
 }
 
@@ -509,46 +559,67 @@ function updateFileTable() {
     return;
   }
   if (emptyRow) emptyRow.style.display = "none";
-  // 确保loadedFiles中的文件信息是最新的，包括newPath, hasConflict, invalidChar
-  // 这一步在updatePreview中已经完成，这里只需使用
 
-  loadedFiles.forEach((fileInfo, index) => {
-    const hasChange = fileInfo.newPath && fileInfo.newPath !== fileInfo.name;
-    let warn = "";
-    let rowClass = "";
+  const thisToken = ++renderToken;
+  const total = loadedFiles.length;
+  const batchSize = 200;
+  let index = 0;
 
-    // 权限检测
-    let permIcon = "";
-    if (fileInfo.writable === false) {
-      warn +=
-        ' <span title="无写权限，跳过" style="color:#e87b00;font-size:1.1em;vertical-align:middle;">🔒</span>';
-      rowClass += "file-row-readonly ";
+  const fileCountElem = document.getElementById("file-count");
+
+  function renderBatch() {
+    if (thisToken !== renderToken) return; // 过期
+    const end = Math.min(index + batchSize, total);
+    const frag = document.createDocumentFragment();
+    for (let i = index; i < end; i++) {
+      const fileInfo = loadedFiles[i];
+      const hasChange = fileInfo.newPath && fileInfo.newPath !== fileInfo.name;
+      let warn = "";
+      let rowClass = "";
+
+      if (fileInfo.writable === false) {
+        warn +=
+          ' <span title="无写权限，跳过" style="color:#e87b00;font-size:1.1em;vertical-align:middle;">🔒</span>';
+        rowClass += "file-row-readonly ";
+      }
+      if (fileInfo.hasConflict) {
+        warn += ' <span style="color:#c00;font-size:0.9em;">(重名冲突)</span>';
+        rowClass += "file-row-conflict ";
+      } else if (fileInfo.invalidChar) {
+        warn += ' <span style="color:#c00;font-size:0.9em;">(非法字符)</span>';
+        rowClass += "file-row-invalid ";
+      }
+
+      const row = document.createElement("tr");
+      row.innerHTML = `
+        <th scope="row">${i + 1}</th>
+        <td>${fileInfo.name}</td>
+        <td>${fileInfo.extension || ""}</td>
+        <td>${formatFileSize(fileInfo.size)}</td>
+        <td>${formatTime(fileInfo.modified_ms)}</td>
+        <td class="preview-cell ${hasChange ? "preview-highlight" : "dimmed"}" style="font-family:monospace;">
+          ${fileInfo.newPath || "(无变化)"} ${warn}
+        </td>
+      `;
+      row.className = rowClass.trim();
+      frag.appendChild(row);
+    }
+    fileTable.appendChild(frag);
+    index = end;
+
+    if (fileCountElem) {
+      fileCountElem.textContent = `渲染中 ${end}/${total} 个文件...`;
     }
 
-    // 冲突或非法字符警告
-    if (fileInfo.hasConflict) {
-      warn += ' <span style="color:#c00;font-size:0.9em;">(重名冲突)</span>';
-      rowClass += "file-row-conflict ";
-    } else if (fileInfo.invalidChar) {
-      warn += ' <span style="color:#c00;font-size:0.9em;">(非法字符)</span>';
-      rowClass += "file-row-invalid ";
+    if (end < total) {
+      requestAnimationFrame(renderBatch);
+    } else {
+      if (fileCountElem) fileCountElem.textContent = `已加载 ${total} 个文件`;
+      // 按钮状态更新由 setupButtonEvents.refreshApplyButton() 统一处理
     }
+  }
 
-    // 行内容
-    let row = document.createElement("tr");
-    row.innerHTML = `
-      <th scope="row">${index + 1}</th>
-      <td>${fileInfo.name}</td>
-      <td class="preview-cell ${
-        hasChange ? "preview-highlight" : "dimmed"
-      }" style="font-family:monospace;">
-        ${fileInfo.newPath || "(无变化)"} ${warn}
-      </td>
-    `;
-    row.className = rowClass.trim();
-    fileTable.appendChild(row);
-  });
-  // 按钮状态更新由 setupButtonEvents.refreshApplyButton() 统一处理
+  requestAnimationFrame(renderBatch);
 }
 
 function updateFileCount() {
