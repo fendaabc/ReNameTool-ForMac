@@ -262,6 +262,9 @@ let fileTable;
 let fileCountElement;
 let clearAllButton;
 let applyRenameButton;
+let contextMenuEl; // 右键菜单容器
+let _ctxMenuBound = false; // 防重复绑定
+let _shortcutsBound = false; // 防重复绑定
 
 // 渲染控制与工具
 let renderToken = 0; // 用于中止过期的渲染任务
@@ -450,6 +453,10 @@ function initializeEventListeners() {
 
   // 选择与排序事件
   setupSelectionAndSorting();
+
+  // 右键菜单与删除
+  setupContextMenu();
+  setupKeyboardShortcuts();
 }
 
 // 文件处理相关
@@ -660,6 +667,183 @@ function clearTable() {
     return;
   }
   fileTable.innerHTML = "";
+}
+
+// ========== 右键菜单与移除：Task 3.2 ==========
+function createContextMenuIfNeeded() {
+  if (contextMenuEl && document.body.contains(contextMenuEl)) return contextMenuEl;
+  const menu = document.createElement('div');
+  menu.id = 'file-context-menu';
+  menu.style.position = 'fixed';
+  menu.style.zIndex = '9999';
+  menu.style.minWidth = '180px';
+  menu.style.background = 'var(--pico-background, #fff)';
+  menu.style.border = '1px solid #d0d7de';
+  menu.style.borderRadius = '10px';
+  menu.style.boxShadow = '0 6px 24px #0002, 0 2px 6px #0001';
+  menu.style.padding = '6px';
+  menu.style.display = 'none';
+  menu.addEventListener('contextmenu', (e) => { e.preventDefault(); });
+  document.body.appendChild(menu);
+  contextMenuEl = menu;
+  return menu;
+}
+
+function hideContextMenu() {
+  if (contextMenuEl) contextMenuEl.style.display = 'none';
+}
+
+function openContextMenuForRow(rowIndex, x, y) {
+  const menu = createContextMenuIfNeeded();
+  menu.innerHTML = '';
+
+  const addItem = (label, onClick, danger = false, disabled = false) => {
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.textContent = label;
+    btn.style.display = 'block';
+    btn.style.width = '100%';
+    btn.style.textAlign = 'left';
+    btn.style.padding = '8px 10px';
+    btn.style.border = 'none';
+    btn.style.background = 'transparent';
+    btn.style.borderRadius = '8px';
+    btn.style.cursor = disabled ? 'not-allowed' : 'pointer';
+    btn.style.color = danger ? '#c1121f' : 'inherit';
+    btn.disabled = !!disabled;
+    btn.addEventListener('click', (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      hideContextMenu();
+      if (!disabled) onClick();
+    });
+    btn.addEventListener('mouseenter', () => { if (!disabled) btn.style.background = 'rgba(0,0,0,0.06)'; });
+    btn.addEventListener('mouseleave', () => { btn.style.background = 'transparent'; });
+    menu.appendChild(btn);
+  };
+
+  const hasAny = loadedFiles && loadedFiles.length > 0;
+  const selectedCount = loadedFiles.filter(f => f.selected).length;
+  const unselectedCount = hasAny ? (loadedFiles.length - selectedCount) : 0;
+
+  addItem('移除所选', () => removeSelectedFiles(), true, selectedCount === 0);
+  addItem('仅移除此项', () => removeFileAtIndex(rowIndex), true, !(rowIndex >= 0 && rowIndex < loadedFiles.length));
+  addItem('移除未选', () => removeUnselectedFiles(), false, unselectedCount === 0);
+  addItem('清空全部', () => clearAllFiles(), true, !hasAny);
+
+  // 定位
+  const vw = window.innerWidth;
+  const vh = window.innerHeight;
+  menu.style.left = Math.min(x, vw - 200) + 'px';
+  menu.style.top = Math.min(y, vh - 160) + 'px';
+  menu.style.display = 'block';
+}
+
+function setupContextMenu() {
+  if (_ctxMenuBound) return;
+  if (!fileTable) fileTable = document.getElementById('file-table-body');
+  if (!fileTable) return;
+
+  document.addEventListener('click', hideContextMenu);
+  window.addEventListener('resize', hideContextMenu);
+  document.addEventListener('scroll', hideContextMenu, true);
+
+  fileTable.addEventListener('contextmenu', (e) => {
+    const tr = e.target && e.target.closest('tr');
+    if (!tr) return;
+    e.preventDefault();
+    const idxStr = tr.getAttribute('data-index');
+    const idx = idxStr ? parseInt(idxStr) : NaN;
+    const x = e.clientX;
+    const y = e.clientY;
+    openContextMenuForRow(isNaN(idx) ? -1 : idx, x, y);
+  });
+  _ctxMenuBound = true;
+}
+
+function removeFileAtIndex(index) {
+  if (!(index >= 0 && index < loadedFiles.length)) return;
+  loadedFiles.splice(index, 1);
+  // 重绘
+  lastSelectedIndex = -1;
+  updateFileTable();
+  updateFileCount();
+  try {
+    if (typeof window.updateStatusBar === 'function') {
+      const selected = loadedFiles.filter(f => f.selected).length;
+      window.updateStatusBar({ total: loadedFiles.length, selected });
+    }
+  } catch (_) {}
+}
+
+function removeSelectedFiles() {
+  if (!loadedFiles || loadedFiles.length === 0) return;
+  const before = loadedFiles.length;
+  loadedFiles = loadedFiles.filter(f => !f.selected);
+  const removed = before - loadedFiles.length;
+  if (removed === 0) return;
+  lastSelectedIndex = -1;
+  updateFileTable();
+  updateFileCount();
+  try {
+    if (typeof window.updateStatusBar === 'function') {
+      const selected = loadedFiles.filter(f => f.selected).length;
+      window.updateStatusBar({ total: loadedFiles.length, selected });
+    }
+  } catch (_) {}
+}
+
+function removeUnselectedFiles() {
+  if (!loadedFiles || loadedFiles.length === 0) return;
+  const before = loadedFiles.length;
+  loadedFiles = loadedFiles.filter(f => f.selected);
+  if (loadedFiles.length === before) return;
+  lastSelectedIndex = -1;
+  updateFileTable();
+  updateFileCount();
+  try {
+    if (typeof window.updateStatusBar === 'function') {
+      const selected = loadedFiles.filter(f => f.selected).length;
+      window.updateStatusBar({ total: loadedFiles.length, selected });
+    }
+  } catch (_) {}
+}
+
+function clearAllFiles() {
+  loadedFiles = [];
+  lastSelectedIndex = -1;
+  updateFileTable();
+  updateFileCount();
+  try {
+    if (typeof window.updateStatusBar === 'function') {
+      window.updateStatusBar({ total: 0, selected: 0 });
+    }
+  } catch (_) {}
+}
+
+function setupKeyboardShortcuts() {
+  if (_shortcutsBound) return;
+  document.addEventListener('keydown', (e) => {
+    // 避免在输入框/文本域中触发删除
+    const tag = (e.target && e.target.tagName) ? e.target.tagName.toLowerCase() : '';
+    const isTyping = tag === 'input' || tag === 'textarea' || e.target.isContentEditable;
+    if (isTyping) return;
+
+    if (e.key === 'Delete' || e.key === 'Backspace') {
+      const anySelected = loadedFiles.some(f => f.selected);
+      if (anySelected) {
+        e.preventDefault();
+        removeSelectedFiles();
+      }
+    }
+    if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'a') {
+      // 快速全选
+      e.preventDefault();
+      loadedFiles.forEach(f => f.selected = true);
+      updateFileTable();
+    }
+  });
+  _shortcutsBound = true;
 }
 
 function updateFileTable() {
