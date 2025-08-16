@@ -123,9 +123,10 @@ aside {
         <h3 style="margin: 0;">文件批量重命名</h3>
       </div>
       <div class="right-group">
-        <button id="apply-rename-top" class="primary-action" title="开始重命名">开始重命名</button>
-        <button id="clear-all-top" class="danger-action" title="清空列表">清空</button>
-        <button id="open-settings" class="secondary-action" title="设置">设置</button>
+        <button id="apply-rename-top" class="primary-action" title="开始重命名" aria-label="开始重命名选中的文件" aria-describedby="file-count">开始重命名</button>
+        <button id="clear-all-top" class="danger-action" title="清空列表" aria-label="清空所有文件和规则设置">清空</button>
+        <button id="open-settings" class="secondary-action" title="设置" aria-label="打开全局设置">设置</button>
+        <button id="show-shortcuts" class="secondary-action" title="键盘快捷键" aria-label="显示键盘快捷键帮助">快捷键</button>
         <button id="theme-toggle" style="background: none; border: none; cursor: pointer; opacity: 0.9;">
           <span id="theme-icon" aria-label="切换主题" style="display:inline-block;width:28px;height:28px;vertical-align:middle;">
             <svg id="icon-moon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:block;"><path d="M21 12.79A9 9 0 1 1 11.21 3a7 7 0 0 0 9.79 9.79z"/></svg>
@@ -139,8 +140,8 @@ aside {
       <section style="display: flex; flex-direction: column; height:100%;">
         <div id="drop-zone" class="card-group" style="border:2px dashed var(--pico-primary);border-radius:13px;padding:1.5rem 1rem;margin-bottom:1.2rem;background:#fafdff;display:flex;flex-direction:column;align-items:center;gap:0.85rem;transition:background 0.18s;">
   <div style="display:flex;gap:0.7rem;">
-    <button id="select-files-btn" class="outline">选择文件</button>
-    <button id="select-folder-btn" class="outline">选择文件夹</button>
+    <button id="select-files-btn" class="outline" aria-label="选择要重命名的文件">选择文件</button>
+    <button id="select-folder-btn" class="outline" aria-label="选择包含要重命名文件的文件夹">选择文件夹</button>
   </div>
   <span style="font-size:0.98em;color:var(--pico-primary);font-weight:500;">可拖拽文件/文件夹或点击按钮导入</span>
 
@@ -156,19 +157,19 @@ aside {
       </tr>
       <tr>
         <th scope="col" style="width:28px;">
-          <input id="select-all" type="checkbox" title="全选/取消全选" />
+          <input id="select-all" type="checkbox" title="全选/取消全选" aria-label="全选或取消全选所有文件" />
         </th>
         <th scope="col">#</th>
-        <th scope="col" id="th-name" data-sort="name" class="sortable" title="点击按名称排序">原文件名</th>
-        <th scope="col" id="th-ext" data-sort="extension" class="sortable" title="点击按扩展名排序">扩展名</th>
-        <th scope="col" id="th-size" data-sort="size" class="sortable" title="点击按大小排序">大小</th>
-        <th scope="col" id="th-time" data-sort="modified_ms" class="sortable" title="点击按修改时间排序">修改时间</th>
+        <th scope="col" id="th-name" data-sort="name" class="sortable" title="点击按名称排序" tabindex="0" role="button" aria-label="按文件名排序">原文件名</th>
+        <th scope="col" id="th-ext" data-sort="extension" class="sortable" title="点击按扩展名排序" tabindex="0" role="button" aria-label="按扩展名排序">扩展名</th>
+        <th scope="col" id="th-size" data-sort="size" class="sortable" title="点击按大小排序" tabindex="0" role="button" aria-label="按文件大小排序">大小</th>
+        <th scope="col" id="th-time" data-sort="modified_ms" class="sortable" title="点击按修改时间排序" tabindex="0" role="button" aria-label="按修改时间排序">修改时间</th>
         <th scope="col">新文件名 (预览)</th>
       </tr>
     </thead>
-    <tbody id="file-table-body">
+    <tbody id="file-table-body" role="grid" aria-label="文件列表">
   <tr id="empty-tip-row">
-    <td colspan="7" style="text-align:center;color:var(--pico-secondary);padding:2.5em 0;font-size:1.05em;">暂无文件，请拖拽或选择文件/文件夹导入</td>
+    <td colspan="7" style="text-align:center;color:var(--pico-secondary);padding:2.5em 0;font-size:1.05em;" role="gridcell">暂无文件，请拖拽或选择文件/文件夹导入</td>
   </tr>
 </tbody>
   </table>
@@ -184,29 +185,50 @@ aside {
             <h5 style="margin-bottom:0.5rem;">一次只可选择并执行一种规则</h5>
           </hgroup>
 
-          <nav style="margin-bottom: 1rem;">
-  <div class="tab-group" style="display:flex;gap:0.5rem;">
-    <button type="button" class="tab-link active" data-tab="tab-replace">查找替换</button>
-    <button type="button" class="tab-link" data-tab="tab-sequence">添加序列</button>
-    <button type="button" class="tab-link" data-tab="tab-case">大小写</button>
+          <nav style="margin-bottom: 1rem;" role="tablist" aria-label="重命名规则选择">
+  <div class="tab-group" style="display:flex;gap:0.3rem;flex-wrap:wrap;">
+    <button type="button" id="tab-replace-btn" class="tab-link active" data-tab="tab-replace" role="tab" aria-selected="true" aria-controls="tab-replace" style="font-size:0.85em;padding:0.4rem 0.6rem;">查找替换</button>
+    <button type="button" id="tab-sequence-btn" class="tab-link" data-tab="tab-sequence" role="tab" aria-selected="false" aria-controls="tab-sequence" style="font-size:0.85em;padding:0.4rem 0.6rem;">添加序列</button>
+    <button type="button" id="tab-slice-btn" class="tab-link" data-tab="tab-slice" role="tab" aria-selected="false" aria-controls="tab-slice" style="font-size:0.85em;padding:0.4rem 0.6rem;">切片替换</button>
+    <button type="button" id="tab-case-btn" class="tab-link" data-tab="tab-case" role="tab" aria-selected="false" aria-controls="tab-case" style="font-size:0.85em;padding:0.4rem 0.6rem;">大小写</button>
+    <button type="button" id="tab-extension-btn" class="tab-link" data-tab="tab-extension" role="tab" aria-selected="false" aria-controls="tab-extension" style="font-size:0.85em;padding:0.4rem 0.6rem;">扩展名</button>
   </div>
 </nav>
 
-          <div id="tab-replace" class="tab-content active">
+          <div id="tab-replace" class="tab-content active" role="tabpanel" aria-labelledby="tab-replace-btn">
             <label for="find">查找内容</label>
-            <input type="text" id="find" name="find" placeholder="例如: IMG_" />
+            <input type="text" id="find" name="find" placeholder="例如: IMG_" aria-describedby="find-help" />
+            <small id="find-help" class="form-text">输入要在文件名中查找的文本</small>
+            
             <label for="replace">替换为</label>
             <input
               type="text"
               id="replace"
               name="replace"
               placeholder="例如: 旅行照片-"
+              aria-describedby="replace-help"
             />
+            <small id="replace-help" class="form-text">输入用于替换的新文本</small>
+            
+            <fieldset style="margin-top: 1rem;">
+              <legend>选项</legend>
+              <label for="regex-mode">
+                <input type="checkbox" id="regex-mode" name="regex" aria-describedby="regex-help" />
+                使用正则表达式
+              </label>
+              <small id="regex-help" class="form-text">启用正则表达式模式进行高级匹配</small>
+              
+              <label for="case-sensitive">
+                <input type="checkbox" id="case-sensitive" name="caseSensitive" aria-describedby="case-help" />
+                区分大小写
+              </label>
+              <small id="case-help" class="form-text">匹配时区分字母大小写</small>
+            </fieldset>
           </div>
 
-          <div id="tab-sequence" class="tab-content">
-            <fieldset>
-              <legend>序列号位置</legend>
+          <div id="tab-sequence" class="tab-content" role="tabpanel" aria-labelledby="tab-sequence-btn">
+            <fieldset role="radiogroup" aria-labelledby="position-legend">
+              <legend id="position-legend">序列号位置</legend>
               <label for="pos-prefix">
                 <input
                   type="radio"
@@ -214,46 +236,162 @@ aside {
                   name="position"
                   value="prefix"
                   checked
+                  aria-describedby="prefix-help"
                 />
                 前缀
               </label>
+              <small id="prefix-help" class="form-text">在文件名前添加序列号</small>
               <label for="pos-suffix">
                 <input
                   type="radio"
                   id="pos-suffix"
                   name="position"
                   value="suffix"
+                  aria-describedby="suffix-help"
                 />
                 后缀
               </label>
+              <small id="suffix-help" class="form-text">在文件名后（扩展名前）添加序列号</small>
             </fieldset>
             <label for="start">起始数字</label>
-            <input type="number" id="start" name="start" value="1" />
+            <input type="number" id="start" name="start" value="1" min="0" max="999999" aria-describedby="start-help" />
+            <small id="start-help" class="form-text">序列号的起始数字</small>
+            
+            <label for="step">步长</label>
+            <input type="number" id="step" name="step" value="1" min="1" max="1000" aria-describedby="step-help" />
+            <small id="step-help" class="form-text">每个文件序列号的增量</small>
+            
             <label for="digits">数字位数 (不足补0)</label>
             <input
               type="number"
               id="digits"
               name="digits"
               value="2"
+              min="1"
+              max="10"
               placeholder="例如: 2 会生成 01, 02..."
+              aria-describedby="digits-help"
             />
+            <small id="digits-help" class="form-text">序列号的位数，不足时前面补0</small>
+            
+            <label for="sequence-order">排序依据</label>
+            <select id="sequence-order" name="order" aria-describedby="order-help">
+              <option value="current">当前排序</option>
+              <option value="name">按文件名</option>
+              <option value="size">按文件大小</option>
+              <option value="modified">按修改时间</option>
+            </select>
+            <small id="order-help" class="form-text">序列号分配的排序依据</small>
           </div>
 
-          <div id="tab-case" class="tab-content">
-            <fieldset>
-              <legend>转换规则</legend>
+          <div id="tab-slice" class="tab-content" role="tabpanel" aria-labelledby="tab-slice-btn">
+            <label for="slice-start">起始位置</label>
+            <input type="number" id="slice-start" name="sliceStart" value="0" min="-255" max="255" aria-describedby="slice-start-help" />
+            <small id="slice-start-help" class="form-text">字符串开始位置，0表示第一个字符，负数表示从末尾倒数</small>
+            
+            <label for="slice-end">结束位置</label>
+            <input type="number" id="slice-end" name="sliceEnd" value="" min="-255" max="255" placeholder="留空表示到末尾" aria-describedby="slice-end-help" />
+            <small id="slice-end-help" class="form-text">字符串结束位置，留空表示到末尾，负数表示从末尾倒数</small>
+            
+            <label for="slice-replacement">替换内容</label>
+            <input type="text" id="slice-replacement" name="sliceReplacement" placeholder="例如: 新文本" aria-describedby="slice-replacement-help" />
+            <small id="slice-replacement-help" class="form-text">用于替换选定范围的新文本，留空表示删除</small>
+            
+            <fieldset style="margin-top: 1rem;">
+              <legend>选项</legend>
+              <label for="slice-preserve-extension">
+                <input type="checkbox" id="slice-preserve-extension" name="preserveExtension" checked aria-describedby="preserve-ext-help" />
+                保留扩展名
+              </label>
+              <small id="preserve-ext-help" class="form-text">只对文件名主体进行切片操作，保持扩展名不变</small>
+            </fieldset>
+          </div>
+
+          <div id="tab-case" class="tab-content" role="tabpanel" aria-labelledby="tab-case-btn">
+            <fieldset role="radiogroup" aria-labelledby="case-legend">
+              <legend id="case-legend">转换规则</legend>
               <label for="case-upper">
-                <input type="radio" id="case-upper" name="caseType" value="upper" />
+                <input type="radio" id="case-upper" name="caseType" value="upper" aria-describedby="upper-help" />
                 全部大写（UPPERCASE）
               </label>
+              <small id="upper-help" class="form-text">将所有字母转换为大写</small>
+              
               <label for="case-lower">
-                <input type="radio" id="case-lower" name="caseType" value="lower" />
+                <input type="radio" id="case-lower" name="caseType" value="lower" aria-describedby="lower-help" />
                 全部小写（lowercase）
               </label>
-              <label for="case-capitalize">
-                <input type="radio" id="case-capitalize" name="caseType" value="capitalize" />
-                首字母大写（Capitalize）
+              <small id="lower-help" class="form-text">将所有字母转换为小写</small>
+              
+              <label for="case-title">
+                <input type="radio" id="case-title" name="caseType" value="title" aria-describedby="title-help" />
+                标题格式（Title Case）
               </label>
+              <small id="title-help" class="form-text">每个单词首字母大写</small>
+              
+              <label for="case-snake">
+                <input type="radio" id="case-snake" name="caseType" value="snake" aria-describedby="snake-help" />
+                蛇形命名（snake_case）
+              </label>
+              <small id="snake-help" class="form-text">将空格和特殊字符替换为下划线，全部小写</small>
+              
+              <label for="case-kebab">
+                <input type="radio" id="case-kebab" name="caseType" value="kebab" aria-describedby="kebab-help" />
+                短横线命名（kebab-case）
+              </label>
+              <small id="kebab-help" class="form-text">将空格和特殊字符替换为短横线，全部小写</small>
+            </fieldset>
+            
+            <fieldset style="margin-top: 1rem;">
+              <legend>选项</legend>
+              <label for="case-preserve-extension">
+                <input type="checkbox" id="case-preserve-extension" name="preserveExtension" checked aria-describedby="case-preserve-ext-help" />
+                保留扩展名
+              </label>
+              <small id="case-preserve-ext-help" class="form-text">只对文件名主体进行大小写转换，保持扩展名不变</small>
+            </fieldset>
+          </div>
+
+          <div id="tab-extension" class="tab-content" role="tabpanel" aria-labelledby="tab-extension-btn">
+            <fieldset role="radiogroup" aria-labelledby="ext-mode-legend">
+              <legend id="ext-mode-legend">操作模式</legend>
+              <label for="ext-mode-change">
+                <input type="radio" id="ext-mode-change" name="extensionMode" value="change" checked aria-describedby="change-help" />
+                修改扩展名
+              </label>
+              <small id="change-help" class="form-text">将文件扩展名更改为指定的新扩展名</small>
+              
+              <label for="ext-mode-remove">
+                <input type="radio" id="ext-mode-remove" name="extensionMode" value="remove" aria-describedby="remove-help" />
+                移除扩展名
+              </label>
+              <small id="remove-help" class="form-text">完全移除文件的扩展名</small>
+              
+              <label for="ext-mode-add">
+                <input type="radio" id="ext-mode-add" name="extensionMode" value="add" aria-describedby="add-help" />
+                添加扩展名
+              </label>
+              <small id="add-help" class="form-text">为没有扩展名的文件添加扩展名</small>
+            </fieldset>
+            
+            <div id="new-extension-group">
+              <label for="new-extension">新扩展名</label>
+              <input type="text" id="new-extension" name="newExtension" placeholder="例如: txt, jpg, pdf" aria-describedby="new-ext-help" />
+              <small id="new-ext-help" class="form-text">输入新的扩展名（不需要包含点号）</small>
+            </div>
+            
+            <fieldset style="margin-top: 1rem;">
+              <legend>选项</legend>
+              <label for="ext-force-change">
+                <input type="checkbox" id="ext-force-change" name="forceChange" aria-describedby="force-help" />
+                强制修改所有文件
+              </label>
+              <small id="force-help" class="form-text">即使文件已有扩展名也强制修改（仅在"添加扩展名"模式下有效）</small>
+              
+              <label for="ext-case-preserve">
+                <input type="checkbox" id="ext-case-preserve" name="preserveCase" checked aria-describedby="case-preserve-help" />
+                保持扩展名大小写
+              </label>
+              <small id="case-preserve-help" class="form-text">保持输入的扩展名大小写，否则转换为小写</small>
             </fieldset>
           </div>
         </div>
@@ -291,21 +429,51 @@ aside {
           document.querySelectorAll('.tab-link').forEach(function(btn) {
             btn.addEventListener('click', function(e) {
               e.preventDefault();
-              // 移除所有tab-link和tab-content的active
-              document.querySelectorAll('.tab-link').forEach(b => b.classList.remove('active'));
-              document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
-              // 当前tab-link和对应内容加active
-              btn.classList.add('active');
-              var tabId = btn.getAttribute('data-tab');
-              var tabContent = document.getElementById(tabId);
-              if(tabContent) tabContent.classList.add('active');
-              // 立即更新预览
-              if (window.updatePreview) {
-                window.updatePreview();
+              switchToTab(btn);
+            });
+            
+            // 添加键盘导航支持
+            btn.addEventListener('keydown', function(e) {
+              if (e.key === 'ArrowLeft' || e.key === 'ArrowRight') {
+                e.preventDefault();
+                const tabs = Array.from(document.querySelectorAll('.tab-link'));
+                const currentIndex = tabs.indexOf(btn);
+                let newIndex;
+                
+                if (e.key === 'ArrowLeft') {
+                  newIndex = currentIndex > 0 ? currentIndex - 1 : tabs.length - 1;
+                } else {
+                  newIndex = currentIndex < tabs.length - 1 ? currentIndex + 1 : 0;
+                }
+                
+                const newTab = tabs[newIndex];
+                newTab.focus();
+                switchToTab(newTab);
               }
-              console.log("Tab switched to:", tabId);
             });
           });
+          
+          function switchToTab(btn) {
+            // 移除所有tab-link和tab-content的active
+            document.querySelectorAll('.tab-link').forEach(b => {
+              b.classList.remove('active');
+              b.setAttribute('aria-selected', 'false');
+            });
+            document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
+            
+            // 当前tab-link和对应内容加active
+            btn.classList.add('active');
+            btn.setAttribute('aria-selected', 'true');
+            var tabId = btn.getAttribute('data-tab');
+            var tabContent = document.getElementById(tabId);
+            if(tabContent) tabContent.classList.add('active');
+            
+            // 立即更新预览
+            if (window.updatePreview) {
+              window.updatePreview();
+            }
+            console.log("Tab switched to:", tabId);
+          }
           console.log("📋 DOM 已加载");
           // 检查 Tauri API
           if (typeof window.__TAURI__ === "undefined") {
@@ -333,6 +501,11 @@ aside {
           const settingsBtn = document.getElementById("open-settings");
           if (settingsBtn) {
             settingsBtn.addEventListener("click", () => alert("设置面板开发中"));
+          }
+          
+          const shortcutsBtn = document.getElementById("show-shortcuts");
+          if (shortcutsBtn) {
+            shortcutsBtn.addEventListener("click", showKeyboardShortcuts);
           }
         });
 
@@ -431,9 +604,33 @@ aside {
                   position: positionElement ? positionElement.value : "prefix",
                 };
                 break;
+              case "slice":
+                ruleData = {
+                  start: parseInt(document.getElementById("slice-start").value) || 0,
+                  end: document.getElementById("slice-end").value ? parseInt(document.getElementById("slice-end").value) : null,
+                  replacement: document.getElementById("slice-replacement").value || "",
+                  preserveExtension: document.getElementById("slice-preserve-extension").checked
+                };
+                break;
               case "case":
                 const checked = document.querySelector('#tab-case input[name="caseType"]:checked');
-                ruleData = { caseType: checked ? checked.value : "" };
+                const preserveExtCheckbox = document.getElementById('case-preserve-extension');
+                ruleData = { 
+                  caseType: checked ? checked.value : "",
+                  preserveExtension: preserveExtCheckbox ? preserveExtCheckbox.checked : true
+                };
+                break;
+              case "extension":
+                const modeChecked = document.querySelector('input[name="extensionMode"]:checked');
+                const newExtInput = document.getElementById('new-extension');
+                const forceChangeChk = document.getElementById('ext-force-change');
+                const preserveCaseChk = document.getElementById('ext-case-preserve');
+                ruleData = {
+                  mode: modeChecked ? modeChecked.value : "",
+                  newExtension: newExtInput ? newExtInput.value.trim() : "",
+                  forceChange: forceChangeChk ? forceChangeChk.checked : false,
+                  preserveCase: preserveCaseChk ? preserveCaseChk.checked : true
+                };
                 break;
             }
             
@@ -488,6 +685,40 @@ aside {
             });
           });
 
+          // 为切片替换输入框添加预览更新
+          const sliceStartInput = document.getElementById("slice-start");
+          const sliceEndInput = document.getElementById("slice-end");
+          const sliceReplacementInput = document.getElementById("slice-replacement");
+          const preserveExtensionCheckbox = document.getElementById("slice-preserve-extension");
+          
+          if (sliceStartInput) {
+            sliceStartInput.addEventListener("input", () => {
+              console.log("📋 [HTML] slice-start变化");
+              if (window.updatePreview) window.updatePreview();
+            });
+          }
+          
+          if (sliceEndInput) {
+            sliceEndInput.addEventListener("input", () => {
+              console.log("📋 [HTML] slice-end变化");
+              if (window.updatePreview) window.updatePreview();
+            });
+          }
+          
+          if (sliceReplacementInput) {
+            sliceReplacementInput.addEventListener("input", () => {
+              console.log("📋 [HTML] slice-replacement变化");
+              if (window.updatePreview) window.updatePreview();
+            });
+          }
+          
+          if (preserveExtensionCheckbox) {
+            preserveExtensionCheckbox.addEventListener("change", () => {
+              console.log("📋 [HTML] preserve-extension变化");
+              if (window.updatePreview) window.updatePreview();
+            });
+          }
+
           // 为大小写转换单选框添加预览更新
           document.querySelectorAll('#tab-case input[name="caseType"]').forEach(function(radio) {
             radio.addEventListener('change', () => {
@@ -495,6 +726,40 @@ aside {
               if (window.updatePreview) window.updatePreview();
             });
           });
+
+          // 为扩展名修改输入框添加预览更新
+          const extensionModeRadios = document.querySelectorAll('input[name="extensionMode"]');
+          const newExtensionInput = document.getElementById("new-extension");
+          const forceChangeCheckbox = document.getElementById("ext-force-change");
+          const preserveCaseCheckbox = document.getElementById("ext-case-preserve");
+          
+          extensionModeRadios.forEach(function(radio) {
+            radio.addEventListener('change', () => {
+              console.log("📋 [HTML] extensionMode变化");
+              if (window.updatePreview) window.updatePreview();
+            });
+          });
+          
+          if (newExtensionInput) {
+            newExtensionInput.addEventListener("input", () => {
+              console.log("📋 [HTML] new-extension变化");
+              if (window.updatePreview) window.updatePreview();
+            });
+          }
+          
+          if (forceChangeCheckbox) {
+            forceChangeCheckbox.addEventListener("change", () => {
+              console.log("📋 [HTML] force-change变化");
+              if (window.updatePreview) window.updatePreview();
+            });
+          }
+          
+          if (preserveCaseCheckbox) {
+            preserveCaseCheckbox.addEventListener("change", () => {
+              console.log("📋 [HTML] preserve-case变化");
+              if (window.updatePreview) window.updatePreview();
+            });
+          }
           
           console.log("📋 [HTML] 预览事件监听器绑定完成");
         }
@@ -829,7 +1094,38 @@ aside {
       }
 
       // updatePreview函数现在由main.js提供
+      
+      // 显示键盘快捷键帮助
+      function showKeyboardShortcuts() {
+        const shortcuts = [
+          { key: 'Ctrl+A / Cmd+A', desc: '全选所有文件' },
+          { key: 'Ctrl+D / Cmd+D', desc: '取消全选' },
+          { key: 'Delete / Backspace', desc: '删除选中文件' },
+          { key: '↑ / ↓', desc: '上下导航选择文件' },
+          { key: 'Shift + ↑ / ↓', desc: '扩展选择范围' },
+          { key: 'Space', desc: '切换当前文件选择状态' },
+          { key: 'Home', desc: '跳到第一个文件' },
+          { key: 'End', desc: '跳到最后一个文件' },
+          { key: 'F2', desc: '开始重命名选中文件' },
+          { key: 'Escape', desc: '取消选择或关闭菜单' },
+          { key: '← / →', desc: '在规则标签间切换' },
+          { key: 'Enter / Space', desc: '激活按钮或排序' }
+        ];
+        
+        let helpText = '键盘快捷键：\n\n';
+        shortcuts.forEach(shortcut => {
+          helpText += `${shortcut.key}: ${shortcut.desc}\n`;
+        });
+        
+        alert(helpText);
+      }
     </script>
+  <script src="src/virtual-scroll.js"></script>
+  <script src="src/replace-rule.js"></script>
+  <script src="src/sequence-rule.js"></script>
+  <script src="src/slice-rule.js"></script>
+  <script src="src/case-rule.js"></script>
+  <script src="src/extension-rule.js"></script>
   <script type="module" src="src/main.js"></script>
 
   <!-- 底部状态栏 -->

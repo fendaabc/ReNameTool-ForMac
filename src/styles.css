@@ -523,6 +523,236 @@ button {
   font-weight: bold !important;
 }
 
+/* 虚拟滚动样式 */
+.file-list-scroll {
+  position: relative;
+}
+
+.file-list-scroll tbody {
+  position: relative;
+}
+
+/* diff高亮样式 */
+.preview-cell.diff-highlight {
+  background-color: #fff3cd !important;
+  border-left: 3px solid #ffc107 !important;
+  animation: diffPulse 0.6s ease-in-out;
+}
+
+@keyframes diffPulse {
+  0% { background-color: #fff3cd; }
+  50% { background-color: #ffeaa7; }
+  100% { background-color: #fff3cd; }
+}
+
+/* 虚拟滚动行样式 */
+.virtual-scroll-row {
+  position: absolute;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+/* 可访问性样式 */
+.form-text {
+  font-size: 0.875em;
+  color: var(--pico-secondary);
+  margin-top: 0.25rem;
+  display: block;
+}
+
+/* 焦点样式增强 */
+button:focus-visible,
+input:focus-visible,
+.tab-link:focus-visible,
+.sortable:focus-visible {
+  outline: 2px solid var(--pico-primary);
+  outline-offset: 2px;
+  box-shadow: 0 0 0 4px rgba(var(--pico-primary-rgb), 0.2);
+}
+
+/* 表头可排序样式 */
+.sortable {
+  cursor: pointer;
+  user-select: none;
+  transition: background-color 0.2s;
+}
+
+.sortable:hover {
+  background-color: rgba(var(--pico-primary-rgb), 0.1);
+}
+
+.sortable:focus {
+  background-color: rgba(var(--pico-primary-rgb), 0.15);
+}
+
+/* 屏幕阅读器专用元素 */
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+/* 高对比度模式支持 */
+@media (prefers-contrast: high) {
+  .preview-cell.preview-highlight {
+    border: 2px solid var(--pico-primary);
+  }
+  
+  .file-row-conflict,
+  .file-row-invalid {
+    border: 2px solid #c00;
+  }
+}
+
+/* 减少动画偏好支持 */
+@media (prefers-reduced-motion: reduce) {
+  .diff-highlight {
+    animation: none;
+  }
+  
+  button, .tab-link, input, .sortable {
+    transition: none;
+  }
+}
+
+/* 输入验证样式 */
+input.error {
+  border-color: #dc3545 !important;
+  box-shadow: 0 0 0 2px rgba(220, 53, 69, 0.25) !important;
+}
+
+input.warning {
+  border-color: #ffc107 !important;
+  box-shadow: 0 0 0 2px rgba(255, 193, 7, 0.25) !important;
+}
+
+.form-text.error {
+  color: #dc3545 !important;
+  font-weight: 500;
+}
+
+.form-text.warning {
+  color: #f57c00 !important;
+  font-weight: 500;
+}
+
+/* 查找替换高亮样式 */
+.find-match {
+  background-color: #fff3cd;
+  color: #856404;
+  padding: 1px 2px;
+  border-radius: 2px;
+  font-weight: bold;
+}
+
+.replace-result {
+  background-color: #d1ecf1;
+  color: #0c5460;
+  padding: 1px 2px;
+  border-radius: 2px;
+  font-weight: bold;
+}
+
+/* 预览高亮变化区域 */
+.preview-cell .highlight {
+  background-color: #fff3cd;
+  color: #856404;
+  padding: 1px 2px;
+  border-radius: 2px;
+  font-weight: bold;
+  animation: highlightPulse 1s ease-in-out;
+}
+
+@keyframes highlightPulse {
+  0% { background-color: #fff3cd; }
+  50% { background-color: #ffeaa7; }
+  100% { background-color: #fff3cd; }
+}
+
+/* 暗色主题下的高亮样式 */
+html[data-theme="dark"] .find-match {
+  background-color: #664d03;
+  color: #fff3cd;
+}
+
+html[data-theme="dark"] .replace-result {
+  background-color: #055160;
+  color: #b6effb;
+}
+
+html[data-theme="dark"] .preview-cell .highlight {
+  background-color: #664d03;
+  color: #fff3cd;
+}
+
+/* 序列号示例样式 */
+.sequence-examples {
+  margin-top: 1.5rem;
+  padding: 1rem;
+  background: var(--pico-background-color);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+}
+
+.sequence-examples h6 {
+  margin: 0 0 0.75rem 0;
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: var(--pico-secondary);
+}
+
+.example-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.example-item {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  font-family: monospace;
+  font-size: 0.85rem;
+}
+
+.example-item .original {
+  color: var(--pico-secondary);
+  min-width: 80px;
+}
+
+.example-item .arrow {
+  color: var(--pico-primary);
+  font-weight: bold;
+}
+
+.example-item .result {
+  color: var(--pico-primary);
+  font-weight: 500;
+}
+
+/* 选择框样式改进 */
+select {
+  background: var(--pico-background-color) !important;
+  color: var(--fg) !important;
+  border: 1.5px solid var(--border) !important;
+  border-radius: 8px !important;
+  padding: 0.6em 1.2em;
+  font-size: 1em;
+  transition: border 0.18s, box-shadow 0.18s;
+}
+
+select:focus {
+  outline: none;
+  border-color: var(--pico-primary) !important;
+  box-shadow: 0 0 0 2px rgba(var(--pico-primary-rgb), 0.25);
+}
+
 @media (prefers-color-scheme: dark) {
   .file-row-conflict,
   .file-row-invalid {
@@ -551,4 +781,241 @@ button {
   button:active {
     background-color: #0f0f0f69;
   }
+}
+
+/* 切片替换规则样式 */
+.slice-examples {
+  margin-top: 1rem;
+  padding: 0.75rem;
+  background: rgba(var(--pico-primary-rgb), 0.05);
+  border-radius: 8px;
+  border: 1px solid rgba(var(--pico-primary-rgb), 0.1);
+}
+
+.slice-examples h6 {
+  margin: 0 0 0.5rem 0;
+  font-size: 0.9em;
+  color: var(--pico-primary);
+  font-weight: 600;
+}
+
+.example-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+}
+
+.example-item {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.85em;
+  font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', monospace;
+}
+
+.example-item .original {
+  color: var(--pico-secondary);
+  flex: 1;
+}
+
+.example-item .arrow {
+  color: var(--pico-primary);
+  font-weight: bold;
+}
+
+.example-item .result {
+  color: var(--pico-primary);
+  font-weight: 500;
+  flex: 1;
+}
+
+.example-item .result.error {
+  color: var(--pico-del-color);
+}
+
+.example-item .error-msg {
+  color: var(--pico-del-color);
+  font-size: 0.8em;
+  font-style: italic;
+}
+
+/* 切片高亮样式 */
+.slice-removed {
+  background-color: rgba(220, 53, 69, 0.2);
+  color: #dc3545;
+  text-decoration: line-through;
+  padding: 0 2px;
+  border-radius: 3px;
+}
+
+.slice-added {
+  background-color: rgba(40, 167, 69, 0.2);
+  color: #28a745;
+  font-weight: bold;
+  padding: 0 2px;
+  border-radius: 3px;
+}
+
+/* 输入框错误和警告样式 */
+input.error {
+  border-color: var(--pico-del-color) !important;
+  background-color: rgba(220, 53, 69, 0.05) !important;
+}
+
+input.warning {
+  border-color: #ffc107 !important;
+  background-color: rgba(255, 193, 7, 0.05) !important;
+}
+
+.form-text.error {
+  color: var(--pico-del-color) !important;
+  font-weight: 500;
+}
+
+.form-text.warning {
+  color: #ffc107 !important;
+  font-weight: 500;
+}/
+* 大小写转换规则样式 */
+.case-examples {
+  margin-top: 1rem;
+  padding: 0.75rem;
+  background: rgba(var(--pico-primary-rgb), 0.05);
+  border-radius: 8px;
+  border: 1px solid rgba(var(--pico-primary-rgb), 0.1);
+}
+
+.case-examples h6 {
+  margin: 0 0 0.5rem 0;
+  font-size: 0.9em;
+  color: var(--pico-primary);
+  font-weight: 600;
+}
+
+/* 大小写变化高亮样式 */
+.case-changed {
+  background-color: rgba(var(--pico-primary-rgb), 0.2);
+  color: var(--pico-primary);
+  font-weight: bold;
+  padding: 0 1px;
+  border-radius: 2px;
+}
+
+/* 单选框组样式优化 */
+#tab-case fieldset {
+  border: 1px solid rgba(var(--pico-primary-rgb), 0.2);
+  border-radius: 8px;
+  padding: 1rem;
+  margin-bottom: 1rem;
+}
+
+#tab-case fieldset legend {
+  color: var(--pico-primary);
+  font-weight: 600;
+  padding: 0 0.5rem;
+}
+
+#tab-case label {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.5rem;
+  margin-bottom: 0.5rem;
+  cursor: pointer;
+}
+
+#tab-case input[type="radio"] {
+  margin-top: 0.2rem;
+  flex-shrink: 0;
+}
+
+#tab-case small {
+  margin-left: 1.5rem;
+  margin-top: -0.3rem;
+  margin-bottom: 0.8rem;
+  display: block;
+  font-size: 0.8em;
+  color: var(--pico-secondary);
+}/* 扩展名修
+改规则样式 */
+.extension-examples {
+  margin-top: 1rem;
+  padding: 0.75rem;
+  background: rgba(var(--pico-primary-rgb), 0.05);
+  border-radius: 8px;
+  border: 1px solid rgba(var(--pico-primary-rgb), 0.1);
+}
+
+.extension-examples h6 {
+  margin: 0 0 0.5rem 0;
+  font-size: 0.9em;
+  color: var(--pico-primary);
+  font-weight: 600;
+}
+
+/* 扩展名变化高亮样式 */
+.ext-removed {
+  background-color: rgba(220, 53, 69, 0.2);
+  color: #dc3545;
+  text-decoration: line-through;
+  padding: 0 2px;
+  border-radius: 3px;
+}
+
+.ext-added {
+  background-color: rgba(40, 167, 69, 0.2);
+  color: #28a745;
+  font-weight: bold;
+  padding: 0 2px;
+  border-radius: 3px;
+}
+
+/* 扩展名输入框组样式 */
+#new-extension-group {
+  margin: 1rem 0;
+  padding: 0.75rem;
+  background: rgba(var(--pico-primary-rgb), 0.03);
+  border-radius: 6px;
+  border: 1px solid rgba(var(--pico-primary-rgb), 0.1);
+}
+
+#new-extension-group label {
+  font-weight: 600;
+  color: var(--pico-primary);
+}
+
+/* 扩展名单选框组样式 */
+#tab-extension fieldset {
+  border: 1px solid rgba(var(--pico-primary-rgb), 0.2);
+  border-radius: 8px;
+  padding: 1rem;
+  margin-bottom: 1rem;
+}
+
+#tab-extension fieldset legend {
+  color: var(--pico-primary);
+  font-weight: 600;
+  padding: 0 0.5rem;
+}
+
+#tab-extension label {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.5rem;
+  margin-bottom: 0.5rem;
+  cursor: pointer;
+}
+
+#tab-extension input[type="radio"],
+#tab-extension input[type="checkbox"] {
+  margin-top: 0.2rem;
+  flex-shrink: 0;
+}
+
+#tab-extension small {
+  margin-left: 1.5rem;
+  margin-top: -0.3rem;
+  margin-bottom: 0.8rem;
+  display: block;
+  font-size: 0.8em;
+  color: var(--pico-secondary);
 }
