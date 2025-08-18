@@ -1,0 +1,426 @@
+<!DOCTYPE html>
+<html lang="zh-CN" data-theme="light">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>后端规则接口测试</title>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@picocss/pico@2/css/pico.min.css">
+    <style>
+        body { padding: 2rem; }
+        .test-section { 
+            margin-bottom: 2rem; 
+            padding: 1rem; 
+            border: 1px solid #ddd; 
+            border-radius: 8px; 
+        }
+        .rule-config {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 1rem;
+            margin: 1rem 0;
+        }
+        .result-box {
+            background: #f8f9fa;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            padding: 1rem;
+            margin: 1rem 0;
+            max-height: 300px;
+            overflow-y: auto;
+        }
+        .preview-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 0.5rem;
+            border-bottom: 1px solid #eee;
+        }
+        .preview-item:last-child {
+            border-bottom: none;
+        }
+        .conflict { color: #dc3545; }
+        .invalid { color: #fd7e14; }
+        .success { color: #28a745; }
+        .error { color: #dc3545; }
+    </style>
+</head>
+<body>
+    <h1>后端规则接口测试</h1>
+    
+    <div class="test-section">
+        <h3>测试文件</h3>
+        <div id="test-files">
+            <p>测试文件列表：</p>
+            <ul id="file-list">
+                <li>IMG_001.jpg</li>
+                <li>IMG_002.png</li>
+                <li>document.txt</li>
+                <li>photo.jpeg</li>
+                <li>video.mp4</li>
+            </ul>
+        </div>
+    </div>
+
+    <div class="test-section">
+        <h3>规则配置</h3>
+        <div>
+            <label for="rule-type">规则类型:</label>
+            <select id="rule-type">
+                <option value="replace">查找替换</option>
+                <option value="sequence">添加序列</option>
+                <option value="slice">切片替换</option>
+                <option value="case">大小写转换</option>
+                <option value="extension">扩展名修改</option>
+            </select>
+        </div>
+
+        <!-- 替换规则配置 -->
+        <div id="replace-config" class="rule-config">
+            <div>
+                <label for="find-text">查找内容:</label>
+                <input type="text" id="find-text" value="IMG_" placeholder="要查找的文本">
+            </div>
+            <div>
+                <label for="replace-text">替换为:</label>
+                <input type="text" id="replace-text" value="Photo_" placeholder="替换的文本">
+            </div>
+            <div>
+                <label>
+                    <input type="checkbox" id="regex-mode"> 正则表达式
+                </label>
+            </div>
+            <div>
+                <label>
+                    <input type="checkbox" id="case-sensitive"> 区分大小写
+                </label>
+            </div>
+        </div>
+
+        <!-- 序列规则配置 -->
+        <div id="sequence-config" class="rule-config" style="display: none;">
+            <div>
+                <label for="seq-start">起始数字:</label>
+                <input type="number" id="seq-start" value="1" min="0">
+            </div>
+            <div>
+                <label for="seq-step">步长:</label>
+                <input type="number" id="seq-step" value="1" min="1">
+            </div>
+            <div>
+                <label for="seq-width">位数:</label>
+                <input type="number" id="seq-width" value="3" min="1" max="10">
+            </div>
+            <div>
+                <label for="seq-order">排序:</label>
+                <select id="seq-order">
+                    <option value="current">当前排序</option>
+                    <option value="name">按名称</option>
+                    <option value="size">按大小</option>
+                </select>
+            </div>
+        </div>
+
+        <!-- 切片规则配置 -->
+        <div id="slice-config" class="rule-config" style="display: none;">
+            <div>
+                <label for="slice-start">起始位置:</label>
+                <input type="number" id="slice-start" value="0">
+            </div>
+            <div>
+                <label for="slice-end">结束位置:</label>
+                <input type="number" id="slice-end" value="4" placeholder="留空表示到末尾">
+            </div>
+            <div>
+                <label for="slice-replacement">替换内容:</label>
+                <input type="text" id="slice-replacement" value="New" placeholder="替换的文本">
+            </div>
+        </div>
+
+        <!-- 大小写规则配置 -->
+        <div id="case-config" class="rule-config" style="display: none;">
+            <div>
+                <label for="case-mode">转换模式:</label>
+                <select id="case-mode">
+                    <option value="upper">全部大写</option>
+                    <option value="lower">全部小写</option>
+                    <option value="title">标题格式</option>
+                    <option value="snake">蛇形命名</option>
+                    <option value="kebab">短横线命名</option>
+                </select>
+            </div>
+        </div>
+
+        <!-- 扩展名规则配置 -->
+        <div id="extension-config" class="rule-config" style="display: none;">
+            <div>
+                <label for="new-extension">新扩展名:</label>
+                <input type="text" id="new-extension" value="pdf" placeholder="新的扩展名">
+            </div>
+            <div>
+                <label>
+                    <input type="checkbox" id="keep-original"> 保留原扩展名
+                </label>
+            </div>
+        </div>
+
+        <div style="margin-top: 1rem;">
+            <button id="preview-btn" class="primary">预览重命名</button>
+            <button id="execute-btn" class="secondary">执行重命名</button>
+        </div>
+    </div>
+
+    <div class="test-section">
+        <h3>预览结果</h3>
+        <div id="preview-results" class="result-box">
+            <p>点击"预览重命名"查看结果</p>
+        </div>
+    </div>
+
+    <div class="test-section">
+        <h3>执行结果</h3>
+        <div id="execute-results" class="result-box">
+            <p>点击"执行重命名"查看结果</p>
+        </div>
+    </div>
+
+    <script>
+        // 测试文件路径
+        const testFiles = [
+            '/test/IMG_001.jpg',
+            '/test/IMG_002.png', 
+            '/test/document.txt',
+            '/test/photo.jpeg',
+            '/test/video.mp4'
+        ];
+
+        // 规则类型切换
+        document.getElementById('rule-type').addEventListener('change', (e) => {
+            // 隐藏所有配置
+            document.querySelectorAll('.rule-config').forEach(config => {
+                config.style.display = 'none';
+            });
+            
+            // 显示选中的配置
+            const selectedConfig = document.getElementById(e.target.value + '-config');
+            if (selectedConfig) {
+                selectedConfig.style.display = 'grid';
+            }
+        });
+
+        // 构建规则对象
+        function buildRule() {
+            const ruleType = document.getElementById('rule-type').value;
+            
+            switch (ruleType) {
+                case 'replace':
+                    return {
+                        type: 'replace',
+                        find: document.getElementById('find-text').value,
+                        replace: document.getElementById('replace-text').value,
+                        regex: document.getElementById('regex-mode').checked,
+                        case_sensitive: document.getElementById('case-sensitive').checked
+                    };
+                
+                case 'sequence':
+                    return {
+                        type: 'sequence',
+                        start: parseInt(document.getElementById('seq-start').value),
+                        step: parseInt(document.getElementById('seq-step').value),
+                        width: parseInt(document.getElementById('seq-width').value),
+                        order: document.getElementById('seq-order').value
+                    };
+                
+                case 'slice':
+                    const endValue = document.getElementById('slice-end').value;
+                    return {
+                        type: 'slice',
+                        start: parseInt(document.getElementById('slice-start').value),
+                        end: endValue ? parseInt(endValue) : null,
+                        replacement: document.getElementById('slice-replacement').value
+                    };
+                
+                case 'case':
+                    return {
+                        type: 'case',
+                        caseType: document.getElementById('case-mode').value
+                    };
+                
+                case 'extension':
+                    const newExt = document.getElementById('new-extension').value;
+                    return {
+                        type: 'extension',
+                        new_extension: newExt ? newExt : null,
+                        keep_original: document.getElementById('keep-original').checked
+                    };
+                
+                default:
+                    return null;
+            }
+        }
+
+        // 预览重命名
+        document.getElementById('preview-btn').addEventListener('click', async () => {
+            const rule = buildRule();
+            if (!rule) {
+                alert('无效的规则配置');
+                return;
+            }
+
+            try {
+                console.log('调用预览接口，规则:', rule);
+                console.log('文件列表:', testFiles);
+                
+                // 检查Tauri API
+                if (typeof window.__TAURI__ === 'undefined') {
+                    throw new Error('Tauri API 不可用，请在Tauri应用中运行此测试');
+                }
+
+                const { invoke } = window.__TAURI__.core;
+                const results = await invoke('preview_rename', {
+                    files: testFiles,
+                    rule: rule
+                });
+
+                console.log('预览结果:', results);
+                displayPreviewResults(results);
+            } catch (error) {
+                console.error('预览失败:', error);
+                document.getElementById('preview-results').innerHTML = 
+                    `<p class="error">预览失败: ${error.message || error}</p>`;
+            }
+        });
+
+        // 执行重命名
+        document.getElementById('execute-btn').addEventListener('click', async () => {
+            const rule = buildRule();
+            if (!rule) {
+                alert('无效的规则配置');
+                return;
+            }
+
+            try {
+                console.log('调用执行接口，规则:', rule);
+                
+                // 检查Tauri API
+                if (typeof window.__TAURI__ === 'undefined') {
+                    throw new Error('Tauri API 不可用，请在Tauri应用中运行此测试');
+                }
+
+                const { invoke } = window.__TAURI__.core;
+                
+                // 构建操作列表
+                const operations = testFiles.map(filePath => {
+                    const fileName = filePath.split('/').pop();
+                    // 这里简化处理，实际应该调用预览接口获取新名称
+                    return {
+                        old_path: filePath,
+                        new_name: fileName // 临时使用原名称
+                    };
+                });
+
+                const result = await invoke('execute_rename_batch', {
+                    operations: operations
+                });
+
+                console.log('执行结果:', result);
+                displayExecuteResults(result);
+            } catch (error) {
+                console.error('执行失败:', error);
+                document.getElementById('execute-results').innerHTML = 
+                    `<p class="error">执行失败: ${error.message || error}</p>`;
+            }
+        });
+
+        // 显示预览结果
+        function displayPreviewResults(results) {
+            const container = document.getElementById('preview-results');
+            
+            if (!results || results.length === 0) {
+                container.innerHTML = '<p>没有预览结果</p>';
+                return;
+            }
+
+            let html = '';
+            results.forEach((result, index) => {
+                let statusClass = 'success';
+                let statusText = '正常';
+                
+                if (result.error_message) {
+                    statusClass = 'error';
+                    statusText = `错误: ${result.error_message}`;
+                } else if (result.has_conflict) {
+                    statusClass = 'conflict';
+                    statusText = '重名冲突';
+                } else if (result.has_invalid_chars) {
+                    statusClass = 'invalid';
+                    statusText = '非法字符';
+                }
+
+                html += `
+                    <div class="preview-item">
+                        <div>
+                            <strong>${result.original_name}</strong> → 
+                            <strong>${result.new_name}</strong>
+                        </div>
+                        <div class="${statusClass}">${statusText}</div>
+                    </div>
+                `;
+            });
+
+            container.innerHTML = html;
+        }
+
+        // 显示执行结果
+        function displayExecuteResults(result) {
+            const container = document.getElementById('execute-results');
+            
+            let html = `
+                <div>
+                    <p><strong>操作ID:</strong> ${result.operation_id}</p>
+                    <p><strong>成功:</strong> ${result.success_count} 个</p>
+                    <p><strong>失败:</strong> ${result.failed_count} 个</p>
+                </div>
+            `;
+
+            if (result.operations && result.operations.length > 0) {
+                html += '<h4>详细结果:</h4>';
+                result.operations.forEach(op => {
+                    const statusClass = op.success ? 'success' : 'error';
+                    const statusText = op.success ? '成功' : `失败: ${op.error_message}`;
+                    
+                    html += `
+                        <div class="preview-item">
+                            <div>
+                                <strong>${op.old_path}</strong> → 
+                                <strong>${op.new_path}</strong>
+                            </div>
+                            <div class="${statusClass}">${statusText}</div>
+                        </div>
+                    `;
+                });
+            }
+
+            container.innerHTML = html;
+        }
+
+        // 页面加载完成
+        document.addEventListener('DOMContentLoaded', () => {
+            console.log('后端规则接口测试页面已加载');
+            
+            // 检查Tauri环境
+            setTimeout(() => {
+                if (typeof window.__TAURI__ !== 'undefined') {
+                    console.log('✅ Tauri API 可用');
+                } else {
+                    console.warn('⚠️ Tauri API 不可用，请在Tauri应用中运行');
+                    document.body.insertAdjacentHTML('afterbegin', 
+                        '<div style="background: #fff3cd; border: 1px solid #ffeaa7; padding: 1rem; margin-bottom: 1rem; border-radius: 4px;">' +
+                        '⚠️ 此测试页面需要在Tauri应用环境中运行才能正常工作' +
+                        '</div>'
+                    );
+                }
+            }, 1000);
+        });
+    </script>
+</body>
+</html>

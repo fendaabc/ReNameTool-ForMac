@@ -11,9 +11,26 @@ function setupSelectionAndSorting() {
   if (selectAll) {
     selectAll.addEventListener('change', (e) => {
       const checked = e.target.checked;
-      loadedFiles.forEach(f => f.selected = checked);
+      
+      // 获取当前显示的文件列表
+      let filesToSelect = loadedFiles;
+      if (window.searchFilterManager && window.searchFilterManager.hasActiveFilters()) {
+        filesToSelect = window.searchFilterManager.getDisplayedFiles();
+      }
+      
+      // 只对当前显示的文件进行全选/取消全选
+      filesToSelect.forEach(f => f.selected = checked);
       lastSelectedIndex = -1;
       updateFileTable();
+      
+      // 公告给屏幕阅读器
+      if (typeof window.announceToScreenReader === 'function') {
+        const action = checked ? '全选' : '取消全选';
+        const count = filesToSelect.length;
+        const filtered = window.searchFilterManager && window.searchFilterManager.hasActiveFilters();
+        const message = filtered ? `${action} ${count} 个显示的文件` : `${action} ${count} 个文件`;
+        window.announceToScreenReader(message);
+      }
     });
   }
 
@@ -181,33 +198,16 @@ function updateSortIndicators() {
   }, 3200);
 }
 
-// 主题切换按钮逻辑
-const themeOrder = ["light", "purelight", "dark"];
-let currentThemeIdx = 0;
-const html = document.documentElement;
-window.addEventListener("DOMContentLoaded", () => {
-  const themeToggle = document.getElementById("theme-toggle");
-  const themeIcon = document.getElementById("theme-icon");
-  function setTheme(idx) {
-    const theme = themeOrder[idx];
-    html.setAttribute("data-theme", theme);
-    // 切换SVG图标
-    if (theme === "dark") {
-      themeIcon.innerHTML = `<svg id=\"icon-sun\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\" style=\"display:block;\"><circle cx=\"12\" cy=\"12\" r=\"5\"/><path d=\"M12 1v2m0 18v2m11-11h-2M3 12H1m16.95 7.07-1.41-1.41M6.34 6.34 4.93 4.93m12.02 0-1.41 1.41M6.34 17.66l-1.41 1.41\"/></svg>`;
-    } else if (theme === "purelight") {
-      themeIcon.innerHTML = `<svg id=\"icon-sun\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\" style=\"display:block;\"><circle cx=\"12\" cy=\"12\" r=\"5\"/><path d=\"M12 1v2m0 18v2m11-11h-2M3 12H1m16.95 7.07-1.41-1.41M6.34 6.34 4.93 4.93m12.02 0-1.41 1.41M6.34 17.66l-1.41 1.41\"/></svg>`;
-    } else {
-      themeIcon.innerHTML = `<svg id=\"icon-moon\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\" style=\"display:block;\"><path d=\"M21 12.79A9 9 0 1 1 11.21 3a7 7 0 0 0 9.79 9.79z\"/></svg>`;
-    }
-  }
-  setTheme(currentThemeIdx);
-  if (themeToggle) {
-    themeToggle.addEventListener("click", () => {
-      currentThemeIdx = (currentThemeIdx + 1) % themeOrder.length;
-      setTheme(currentThemeIdx);
-    });
-  }
-});
+// 主题管理现在由 theme-manager.js 处理
+// 这里只保留必要的初始化代码
+
+// 初始化主题函数（兼容性保留）
+function initializeTheme() {
+  // 主题管理现在由ThemeManager处理
+  console.log("🎨 主题初始化由ThemeManager处理");
+}
+
+// Tab组滚动检测现在由ThemeManager处理
 
 import { invoke } from "@tauri-apps/api/core";
 import { open } from "@tauri-apps/plugin-dialog";
@@ -227,6 +227,92 @@ window.getLoadedFiles = () => {
 };
 
 // 暴露设置文件列表的函数
+
+// 屏幕阅读器公告函数 - 可访问性支持
+function announceToScreenReader(message) {
+  // 创建一个临时的aria-live区域来公告消息
+  let announcer = document.getElementById('screen-reader-announcer');
+  if (!announcer) {
+    announcer = document.createElement('div');
+    announcer.id = 'screen-reader-announcer';
+    announcer.setAttribute('aria-live', 'polite');
+    announcer.setAttribute('aria-atomic', 'true');
+    announcer.className = 'sr-only';
+    document.body.appendChild(announcer);
+  }
+  
+  // 清空后设置新消息，确保屏幕阅读器能够读出
+  announcer.textContent = '';
+  setTimeout(() => {
+    announcer.textContent = message;
+  }, 100);
+  
+  // 5秒后清空消息
+  setTimeout(() => {
+    announcer.textContent = '';
+  }, 5000);
+}
+
+// 暴露公告函数到全局
+window.announceToScreenReader = announceToScreenReader;
+
+// 键盘导航检测 - 可访问性增强
+function initializeKeyboardNavigation() {
+  let isUsingKeyboard = false;
+  
+  // 检测键盘使用
+  document.addEventListener('keydown', (e) => {
+    if (e.key === 'Tab' || e.key === 'ArrowUp' || e.key === 'ArrowDown' || 
+        e.key === 'ArrowLeft' || e.key === 'ArrowRight' || e.key === 'Enter' || e.key === ' ') {
+      if (!isUsingKeyboard) {
+        isUsingKeyboard = true;
+        document.body.classList.add('using-keyboard');
+        document.body.classList.remove('using-mouse');
+      }
+    }
+  });
+  
+  // 检测鼠标使用
+  document.addEventListener('mousedown', () => {
+    if (isUsingKeyboard) {
+      isUsingKeyboard = false;
+      document.body.classList.add('using-mouse');
+      document.body.classList.remove('using-keyboard');
+    }
+  });
+  
+  // 初始状态设为鼠标模式
+  document.body.classList.add('using-mouse');
+}
+
+// 在DOM加载后初始化键盘导航检测
+document.addEventListener('DOMContentLoaded', initializeKeyboardNavigation);
+
+// 检测用户动画偏好
+function initializeMotionPreferences() {
+  const prefersReducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)');
+  
+  function updateMotionPreference(mediaQuery) {
+    if (mediaQuery.matches) {
+      document.documentElement.classList.add('reduced-motion');
+      console.log('用户偏好减少动画，已禁用动画效果');
+    } else {
+      document.documentElement.classList.remove('reduced-motion');
+      console.log('用户允许动画，已启用动画效果');
+    }
+  }
+  
+  // 初始检查
+  updateMotionPreference(prefersReducedMotion);
+  
+  // 监听偏好变化
+  prefersReducedMotion.addEventListener('change', updateMotionPreference);
+}
+
+// 在DOM加载后初始化动画偏好检测
+document.addEventListener('DOMContentLoaded', initializeMotionPreferences);
+
+// 主题切换视觉通知现在由ThemeManager处理
 window.setLoadedFiles = (files) => {
   console.log("🔧 [main.js] setLoadedFiles被调用，设置:", files);
   loadedFiles = files.map(filePath => ({
@@ -248,12 +334,7 @@ window.renderToken = renderToken;
 window.formatFileSize = formatFileSize;
 window.formatTime = formatTime;
 
-// 规则管理器
-let replaceRuleManager = null;
-let sequenceRuleManager = null;
-let sliceRuleManager = null;
-let caseRuleManager = null;
-let extensionRuleManager = null;
+// 规则管理器已移至后端Rust实现
 
 // 立即暴露所有需要的函数
 window.updatePreview = () => {
@@ -356,10 +437,13 @@ let positionRadios;
 
 // 确保DOM加载完成后执行
 document.addEventListener("DOMContentLoaded", () => {
-  initializeEventListeners();
-
-  // 初始化主题
+  // 初始化主题（优先执行，确保正确的主题在页面渲染前应用）
   initializeTheme();
+  
+  initializeEventListeners();
+  
+  // 初始化键盘导航检测
+  initializeKeyboardNavigation();
 
   loadHistory();
   console.log("=== DOM 已加载，开始初始化 ===");
@@ -368,60 +452,41 @@ document.addEventListener("DOMContentLoaded", () => {
   
   initializeEventListeners();
   
-  // 初始化规则管理器
-  initializeRuleManagers();
-  
-  // 添加简单的拖拽测试
-  testDragDrop();
+  // 规则管理器已移至后端，无需前端初始化
   
   // executeRename函数已在文件开头暴露
 });
 
-// 简单的拖拽测试函数
-function testDragDrop() {
-  console.log("=== 开始设置拖拽测试 ===");
-
-  // 在整个文档上监听拖拽事件
-  document.addEventListener("dragenter", function (e) {
-    console.log("🔥 Document dragenter detected!", e);
-    document.body.style.border = "3px solid red";
-    e.preventDefault();
+// 键盘导航检测
+function initializeKeyboardNavigation() {
+  let isUsingKeyboard = false;
+  
+  // 检测键盘使用
+  document.addEventListener('keydown', (e) => {
+    if (e.key === 'Tab' || e.key === 'ArrowUp' || e.key === 'ArrowDown' || 
+        e.key === 'ArrowLeft' || e.key === 'ArrowRight' || e.key === 'Enter' || e.key === ' ') {
+      if (!isUsingKeyboard) {
+        isUsingKeyboard = true;
+        document.body.classList.add('keyboard-navigation-active');
+      }
+    }
   });
-
-  document.addEventListener("dragover", function (e) {
-    console.log("🔥 Document dragover detected!", e);
-    e.preventDefault();
+  
+  // 检测鼠标使用
+  document.addEventListener('mousedown', () => {
+    if (isUsingKeyboard) {
+      isUsingKeyboard = false;
+      document.body.classList.remove('keyboard-navigation-active');
+    }
   });
-
-  document.addEventListener("drop", function (e) {
-    console.log("🔥 Document drop detected!", e);
-    console.log("🔥 Files:", e.dataTransfer.files);
-    document.body.style.border = "";
-    e.preventDefault();
+  
+  // 检测触摸使用
+  document.addEventListener('touchstart', () => {
+    if (isUsingKeyboard) {
+      isUsingKeyboard = false;
+      document.body.classList.remove('keyboard-navigation-active');
+    }
   });
-
-  document.addEventListener("dragleave", function (e) {
-    console.log("🔥 Document dragleave detected!", e);
-    document.body.style.border = "";
-  });
-
-  // 也在 body 上监听
-  document.body.addEventListener("dragenter", function (e) {
-    console.log("🟢 Body dragenter detected!", e);
-    e.preventDefault();
-  });
-
-  document.body.addEventListener("dragover", function (e) {
-    console.log("🟢 Body dragover detected!", e);
-    e.preventDefault();
-  });
-
-  document.body.addEventListener("drop", function (e) {
-    console.log("🟢 Body drop detected!", e);
-    e.preventDefault();
-  });
-
-  console.log("=== 拖拽测试监听器已设置 ===");
 }
 
 function initializeElements() {
@@ -667,6 +732,11 @@ async function handleFilePathsWithFolders(paths) {
     updateFileTable();
     updateFileCount();
 
+    // 通知搜索过滤管理器文件列表已更新
+    if (window.searchFilterManager) {
+      window.searchFilterManager.onFilesUpdated();
+    }
+
     updatePreview();
     // 只显示文件数量统计
     const fileCountElem2 = document.getElementById("file-count");
@@ -858,6 +928,12 @@ function clearAllFiles() {
   loadedFiles = [];
   window.loadedFiles = loadedFiles; // 同步到window对象
   lastSelectedIndex = -1;
+  
+  // 通知搜索过滤管理器文件列表已清空
+  if (window.searchFilterManager) {
+    window.searchFilterManager.onFilesUpdated();
+  }
+  
   updateFileTable();
   updateFileCount();
   try {
@@ -899,23 +975,42 @@ function setupKeyboardShortcuts() {
     // 全选文件 (Ctrl+A / Cmd+A)
     if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'a') {
       e.preventDefault();
-      const beforeCount = loadedFiles.filter(f => f.selected).length;
-      loadedFiles.forEach(f => f.selected = true);
+      
+      // 获取当前显示的文件列表
+      let filesToSelect = loadedFiles;
+      if (window.searchFilterManager && window.searchFilterManager.hasActiveFilters()) {
+        filesToSelect = window.searchFilterManager.getDisplayedFiles();
+      }
+      
+      filesToSelect.forEach(f => f.selected = true);
       window.loadedFiles = loadedFiles; // 同步到window对象
       updateFileTable();
-      announceToScreenReader(`已全选 ${loadedFiles.length} 个文件`);
+      
+      const filtered = window.searchFilterManager && window.searchFilterManager.hasActiveFilters();
+      const message = filtered ? `已全选 ${filesToSelect.length} 个显示的文件` : `已全选 ${filesToSelect.length} 个文件`;
+      announceToScreenReader(message);
       return;
     }
 
     // 取消全选 (Ctrl+D / Cmd+D)
     if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'd') {
       e.preventDefault();
-      const beforeCount = loadedFiles.filter(f => f.selected).length;
+      
+      // 获取当前显示的文件列表
+      let filesToDeselect = loadedFiles;
+      if (window.searchFilterManager && window.searchFilterManager.hasActiveFilters()) {
+        filesToDeselect = window.searchFilterManager.getDisplayedFiles();
+      }
+      
+      const beforeCount = filesToDeselect.filter(f => f.selected).length;
       if (beforeCount > 0) {
-        loadedFiles.forEach(f => f.selected = false);
+        filesToDeselect.forEach(f => f.selected = false);
         window.loadedFiles = loadedFiles; // 同步到window对象
         updateFileTable();
-        announceToScreenReader(`已取消选择所有文件`);
+        
+        const filtered = window.searchFilterManager && window.searchFilterManager.hasActiveFilters();
+        const message = filtered ? `已取消选择 ${beforeCount} 个显示的文件` : `已取消选择所有文件`;
+        announceToScreenReader(message);
       }
       return;
     }
@@ -1029,37 +1124,7 @@ function setupKeyboardShortcuts() {
 }
 
 // 初始化规则管理器
-function initializeRuleManagers() {
-  // 初始化查找替换规则管理器
-  if (window.ReplaceRuleManager) {
-    replaceRuleManager = new window.ReplaceRuleManager();
-    console.log("✅ [initializeRuleManagers] 查找替换规则管理器已初始化");
-  }
-  
-  // 初始化序列号规则管理器
-  if (window.SequenceRuleManager) {
-    sequenceRuleManager = new window.SequenceRuleManager();
-    console.log("✅ [initializeRuleManagers] 序列号规则管理器已初始化");
-  }
-  
-  // 初始化切片替换规则管理器
-  if (window.SliceRuleManager) {
-    sliceRuleManager = new window.SliceRuleManager();
-    console.log("✅ [initializeRuleManagers] 切片替换规则管理器已初始化");
-  }
-  
-  // 初始化大小写转换规则管理器
-  if (window.CaseRuleManager) {
-    caseRuleManager = new window.CaseRuleManager();
-    console.log("✅ [initializeRuleManagers] 大小写转换规则管理器已初始化");
-  }
-  
-  // 初始化扩展名修改规则管理器
-  if (window.ExtensionRuleManager) {
-    extensionRuleManager = new window.ExtensionRuleManager();
-    console.log("✅ [initializeRuleManagers] 扩展名修改规则管理器已初始化");
-  }
-}
+// 规则管理器已移至后端Rust实现，前端不再需要初始化
 
 // 箭头键导航处理
 function handleArrowKeyNavigation(direction, shiftKey) {
@@ -1364,6 +1429,12 @@ function updateFileTable() {
   const emptyRow = document.getElementById("empty-tip-row");
   const applyRenameButton = document.getElementById("apply-rename");
   
+  // 获取要显示的文件列表（考虑搜索过滤）
+  let filesToDisplay = loadedFiles;
+  if (window.searchFilterManager && window.searchFilterManager.hasActiveFilters()) {
+    filesToDisplay = window.searchFilterManager.getDisplayedFiles();
+  }
+  
   if (loadedFiles.length === 0) {
     // 清理虚拟滚动管理器
     if (virtualScrollManager) {
@@ -1377,10 +1448,27 @@ function updateFileTable() {
     return;
   }
   
+  // 处理过滤后的空结果
+  if (filesToDisplay.length === 0) {
+    clearTable();
+    const emptyMessage = window.searchFilterManager && window.searchFilterManager.hasActiveFilters() 
+      ? `未找到匹配的文件 (共 ${loadedFiles.length} 个文件)`
+      : "暂无文件，请拖拽或选择文件/文件夹导入";
+    
+    fileTable.innerHTML = `
+      <tr id="empty-tip-row">
+        <td colspan="7" style="text-align:center;color:var(--pico-secondary);padding:2.5em 0;font-size:1.05em;" role="gridcell">
+          ${emptyMessage}
+        </td>
+      </tr>
+    `;
+    return;
+  }
+  
   if (emptyRow) emptyRow.style.display = "none";
 
   const thisToken = ++renderToken;
-  const total = loadedFiles.length;
+  const total = filesToDisplay.length;
   const batchSize = 200;
   let index = 0;
 
@@ -1390,7 +1478,7 @@ function updateFileTable() {
   if (sortKey) {
     const key = sortKey;
     const asc = sortAsc ? 1 : -1;
-    loadedFiles.sort((a, b) => {
+    filesToDisplay.sort((a, b) => {
       const va = a[key];
       const vb = b[key];
       if (key === 'size' || key === 'modified_ms') {
@@ -1410,7 +1498,9 @@ function updateFileTable() {
     const end = Math.min(index + batchSize, total);
     const frag = document.createDocumentFragment();
     for (let i = index; i < end; i++) {
-      const fileInfo = loadedFiles[i];
+      const fileInfo = filesToDisplay[i];
+      // 获取在原始数组中的索引，用于正确的选择和操作
+      const originalIndex = loadedFiles.indexOf(fileInfo);
       const hasChange = fileInfo.newPath && fileInfo.newPath !== fileInfo.name;
       let warn = "";
       let rowClass = "";
@@ -1429,11 +1519,11 @@ function updateFileTable() {
       }
 
       const row = document.createElement("tr");
-      row.dataset.index = String(i);
+      row.dataset.index = String(originalIndex);
       row.setAttribute('role', 'row');
       row.setAttribute('aria-selected', fileInfo.selected ? 'true' : 'false');
       row.innerHTML = `
-        <td role="gridcell"><input type="checkbox" class="row-select" data-index="${i}" ${fileInfo.selected ? "checked" : ""} aria-label="选择文件 ${fileInfo.name}" /></td>
+        <td role="gridcell"><input type="checkbox" class="row-select" data-index="${originalIndex}" ${fileInfo.selected ? "checked" : ""} aria-label="选择文件 ${fileInfo.name}" /></td>
         <th scope="row" role="rowheader">${i + 1}</th>
         <td role="gridcell">${fileInfo.name}</td>
         <td role="gridcell">${fileInfo.extension || ""}</td>
@@ -1450,23 +1540,37 @@ function updateFileTable() {
     index = end;
 
     if (fileCountElem) {
-      fileCountElem.textContent = `渲染中 ${end}/${total} 个文件...`;
+      const displayText = window.searchFilterManager && window.searchFilterManager.hasActiveFilters() 
+        ? `渲染中 ${end}/${total} 个文件 (已过滤，共 ${loadedFiles.length} 个)`
+        : `渲染中 ${end}/${total} 个文件...`;
+      fileCountElem.textContent = displayText;
     }
 
     if (end < total) {
       requestAnimationFrame(renderBatch);
     } else {
-      if (fileCountElem) fileCountElem.textContent = `已加载 ${total} 个文件`;
+      if (fileCountElem) {
+        const displayText = window.searchFilterManager && window.searchFilterManager.hasActiveFilters() 
+          ? `显示 ${total} 个文件 (已过滤，共 ${loadedFiles.length} 个)`
+          : `已加载 ${total} 个文件`;
+        fileCountElem.textContent = displayText;
+      }
       // 同步状态栏与“全选”勾选状态
       try {
         const selectedCount = loadedFiles.filter(f => f.selected).length;
+        const displayedSelectedCount = filesToDisplay.filter(f => f.selected).length;
         if (typeof window.updateStatusBar === 'function') {
-          window.updateStatusBar({ total: loadedFiles.length, selected: selectedCount });
+          window.updateStatusBar({ 
+            total: loadedFiles.length, 
+            displayed: filesToDisplay.length,
+            selected: selectedCount,
+            filtered: window.searchFilterManager && window.searchFilterManager.hasActiveFilters()
+          });
         }
         const selectAllEl = document.getElementById('select-all');
         if (selectAllEl) {
-          selectAllEl.indeterminate = selectedCount > 0 && selectedCount < loadedFiles.length;
-          selectAllEl.checked = selectedCount > 0 && selectedCount === loadedFiles.length;
+          selectAllEl.indeterminate = displayedSelectedCount > 0 && displayedSelectedCount < filesToDisplay.length;
+          selectAllEl.checked = displayedSelectedCount > 0 && displayedSelectedCount === filesToDisplay.length;
         }
       } catch (_) {}
       // 按钮状态更新由 setupButtonEvents.refreshApplyButton() 统一处理
@@ -1474,8 +1578,8 @@ function updateFileTable() {
   }
 
   // 判断是否需要启用虚拟滚动
-  if (loadedFiles.length > VIRTUAL_SCROLL_THRESHOLD) {
-    console.log(`🚀 [updateFileTable] 启用虚拟滚动 (${loadedFiles.length} 个文件)`);
+  if (filesToDisplay.length > VIRTUAL_SCROLL_THRESHOLD) {
+    console.log(`🚀 [updateFileTable] 启用虚拟滚动 (${filesToDisplay.length} 个文件)`);
     
     // 清理常规渲染
     clearTable();
@@ -1485,16 +1589,22 @@ function updateFileTable() {
       virtualScrollManager = new window.VirtualScrollManager(fileTable, VIRTUAL_ITEM_HEIGHT, VIRTUAL_BUFFER_SIZE);
     }
     
+    // 设置虚拟滚动的数据源为过滤后的文件
+    virtualScrollManager.setDataSource(filesToDisplay);
+    
     // 使用虚拟滚动渲染
     virtualScrollManager.updateVisibleRange();
     virtualScrollManager.renderVisibleItems();
     
     const fileCountElem = document.getElementById("file-count");
     if (fileCountElem) {
-      fileCountElem.textContent = `已加载 ${loadedFiles.length} 个文件 (虚拟滚动)`;
+      const displayText = window.searchFilterManager && window.searchFilterManager.hasActiveFilters() 
+        ? `显示 ${filesToDisplay.length} 个文件 (已过滤，共 ${loadedFiles.length} 个，虚拟滚动)`
+        : `已加载 ${filesToDisplay.length} 个文件 (虚拟滚动)`;
+      fileCountElem.textContent = displayText;
     }
   } else {
-    console.log(`🔧 [updateFileTable] 使用常规渲染 (${loadedFiles.length} 个文件)`);
+    console.log(`🔧 [updateFileTable] 使用常规渲染 (${filesToDisplay.length} 个文件)`);
     
     // 清理虚拟滚动管理器
     if (virtualScrollManager) {
@@ -1621,18 +1731,15 @@ function checkForConflicts() {
 }
 
 function updatePreview() {
-  console.log("🔄 [updatePreview] 被调用，loadedFiles.length:", loadedFiles.length);
+  console.log("🔄 [updatePreview] 被调用，使用PreviewManager");
   
-  if (loadedFiles.length === 0) return;
-
-  console.log("🔄 [updatePreview] 开始更新预览");
-  
-  // 1. 更新所有文件的预览名称
-  loadedFiles.forEach((fileInfo, index) => {
-    const oldNewPath = fileInfo.newPath;
-    fileInfo.newPath = getPreviewName(fileInfo.name, false, index);
-    console.log(`🔄 [updatePreview] 文件${index}: ${fileInfo.name} -> ${oldNewPath} -> ${fileInfo.newPath}`);
-  });
+  // 使用新的PreviewManager处理预览
+  if (window.previewManager) {
+    window.previewManager.updatePreview();
+  } else {
+    console.warn("⚠️ [updatePreview] PreviewManager未初始化，使用备用方案");
+    updatePreviewFallback();
+  }
 
   // 2. 检查冲突和非法字符
   const hasConflicts = checkForConflicts();
@@ -1667,6 +1774,54 @@ function updatePreview() {
   document.dispatchEvent(new Event("refresh-apply"));
 }
 
+// 备用预览更新方案（保持兼容性）
+function updatePreviewFallback() {
+  console.log("🔄 [updatePreviewFallback] 使用备用预览方案");
+  
+  if (loadedFiles.length === 0) return;
+
+  console.log("🔄 [updatePreviewFallback] 开始更新预览");
+  
+  // 1. 更新所有文件的预览名称
+  loadedFiles.forEach((fileInfo, index) => {
+    const oldNewPath = fileInfo.newPath;
+    fileInfo.newPath = getPreviewName(fileInfo.name, false, index);
+    console.log(`🔄 [updatePreviewFallback] 文件${index}: ${fileInfo.name} -> ${oldNewPath} -> ${fileInfo.newPath}`);
+  });
+
+  // 2. 检查冲突和非法字符
+  const hasConflicts = checkForConflicts();
+
+  // 3. 更新表格显示
+  const previewCells = document.querySelectorAll(".preview-cell");
+  loadedFiles.forEach((fileInfo, index) => {
+    if (index < previewCells.length) {
+      const cell = previewCells[index];
+      let className = "preview-cell";
+      let textContent = fileInfo.newPath;
+
+      if (fileInfo.hasConflict) {
+        className += " conflict";
+        textContent = "冲突! " + fileInfo.newPath; // 显示冲突提示
+      } else if (fileInfo.invalidChar) {
+        className += " invalid-char";
+        textContent = "非法字符! " + fileInfo.newPath; // 显示非法字符提示
+      } else if (fileInfo.newPath === fileInfo.name) {
+        className += " dimmed";
+        textContent = "(无变化)";
+      } else {
+        className += " preview-highlight";
+      }
+
+      cell.textContent = textContent;
+      cell.className = className;
+    }
+  });
+
+  // 4. 更新"执行重命名"按钮状态
+  document.dispatchEvent(new Event("refresh-apply"));
+}
+
 function getPreviewName(fileName, withHighlight = false, fileIndex = 0) {
   // Use consistent method to get active tab
   const activeTab = document.querySelector(".tab-content.active");
@@ -1691,14 +1846,7 @@ function getPreviewName(fileName, withHighlight = false, fileIndex = 0) {
 }
 
 function getPreviewForReplace(fileName, withHighlight = false) {
-  // 使用规则管理器如果可用
-  if (replaceRuleManager) {
-    if (withHighlight) {
-      return replaceRuleManager.getHighlightedPreview(fileName);
-    } else {
-      return replaceRuleManager.applyRule(fileName);
-    }
-  }
+  // 规则预览现在由后端Rust实现处理
   
   // 回退到原始实现
   if (!findInput) {
@@ -1722,14 +1870,7 @@ function getPreviewForReplace(fileName, withHighlight = false) {
 }
 
 function getPreviewForSequence(fileName, withHighlight = false, fileIndex = 0) {
-  // 使用规则管理器如果可用
-  if (sequenceRuleManager) {
-    if (withHighlight) {
-      return sequenceRuleManager.getHighlightedPreview(fileName, fileIndex);
-    } else {
-      return sequenceRuleManager.applyRule(fileName, fileIndex);
-    }
-  }
+  // 规则预览现在由后端Rust实现处理
   
   // 回退到原始实现
   if (!startInput) {
@@ -1768,14 +1909,7 @@ function getPreviewForSequence(fileName, withHighlight = false, fileIndex = 0) {
 }
 
 function getPreviewForSlice(fileName, withHighlight = false) {
-  // 使用规则管理器如果可用
-  if (sliceRuleManager) {
-    if (withHighlight) {
-      return sliceRuleManager.getHighlightedPreview(fileName);
-    } else {
-      return sliceRuleManager.applyRule(fileName);
-    }
-  }
+  // 规则预览现在由后端Rust实现处理
   
   // 回退到原始实现
   const startInput = document.getElementById("slice-start");
@@ -1820,14 +1954,7 @@ function getPreviewForSlice(fileName, withHighlight = false) {
 }
 
 function getPreviewForCase(fileName, withHighlight = false) {
-  // 使用规则管理器如果可用
-  if (caseRuleManager) {
-    if (withHighlight) {
-      return caseRuleManager.getHighlightedPreview(fileName);
-    } else {
-      return caseRuleManager.applyRule(fileName);
-    }
-  }
+  // 规则预览现在由后端Rust实现处理
   
   // 回退到原始实现
   const checked = document.querySelector('#tab-case input[name="caseType"]:checked');
@@ -1884,14 +2011,7 @@ function getPreviewForCase(fileName, withHighlight = false) {
 }
 
 function getPreviewForExtension(fileName, withHighlight = false) {
-  // 使用规则管理器如果可用
-  if (extensionRuleManager) {
-    if (withHighlight) {
-      return extensionRuleManager.getHighlightedPreview(fileName);
-    } else {
-      return extensionRuleManager.applyRule(fileName);
-    }
-  }
+  // 规则预览现在由后端Rust实现处理
   
   // 回退到原始实现
   const modeRadios = document.querySelectorAll('input[name="extensionMode"]');
@@ -2192,99 +2312,9 @@ async function executeRename(filePaths, activeTabId, ruleData) {
   console.log("🚀 [前端日志] 激活选项卡:", activeTabId);
   console.log("🚀 [前端日志] 规则数据:", ruleData);
 
-
   if (filePaths.length === 0) {
     showErrorMsg("请先选择文件");
     return;
-  }
-
-  // 校验规则
-  if (activeTabId === "replace") {
-    if (!ruleData.find) {
-      showErrorMsg("请输入要查找的内容");
-      return;
-    }
-    if (ruleData.find.length === 0) {
-      showErrorMsg("查找内容不能为空");
-      return;
-    }
-  }
-  
-  if (activeTabId === "sequence") {
-    if (ruleData.start === undefined || ruleData.start === null) {
-      showErrorMsg("请填写序列号起始数字");
-      return;
-    }
-    if (ruleData.start < 0) {
-      showErrorMsg("序列号起始数字不能为负数");
-      return;
-    }
-    if (!ruleData.digits || ruleData.digits <= 0) {
-      showErrorMsg("序列号位数必须大于0");
-      return;
-    }
-    if (ruleData.digits > 10) {
-      showErrorMsg("序列号位数不能超过10位");
-      return;
-    }
-    if (!ruleData.position) {
-      showErrorMsg("请选择序列号位置（前缀或后缀）");
-      return;
-    }
-  }
-  
-  if (activeTabId === "slice") {
-    if (ruleData.start === undefined || ruleData.start === null) {
-      showErrorMsg("请填写起始位置");
-      return;
-    }
-    if (ruleData.start < -255 || ruleData.start > 255) {
-      showErrorMsg("起始位置必须在-255到255之间");
-      return;
-    }
-    if (ruleData.end !== null && (ruleData.end < -255 || ruleData.end > 255)) {
-      showErrorMsg("结束位置必须在-255到255之间");
-      return;
-    }
-    if (ruleData.replacement && ruleData.replacement.length > 200) {
-      showErrorMsg("替换内容不能超过200个字符");
-      return;
-    }
-    // 检查非法字符
-    if (ruleData.replacement && /[<>:"/\\|?*]/.test(ruleData.replacement)) {
-      showErrorMsg("替换内容包含文件名非法字符");
-      return;
-    }
-  }
-  
-  if (activeTabId === "case") {
-    if (!ruleData.caseType) {
-      showErrorMsg("请选择大小写转换类型");
-      return;
-    }
-    if (!["upper", "lower", "title", "snake", "kebab"].includes(ruleData.caseType)) {
-      showErrorMsg("无效的大小写转换类型");
-      return;
-    }
-  }
-  
-  if (activeTabId === "extension") {
-    if (!ruleData.mode) {
-      showErrorMsg("请选择扩展名操作模式");
-      return;
-    }
-    if (!["change", "remove", "add"].includes(ruleData.mode)) {
-      showErrorMsg("无效的扩展名操作模式");
-      return;
-    }
-    if ((ruleData.mode === "change" || ruleData.mode === "add") && !ruleData.newExtension) {
-      showErrorMsg("请输入新的扩展名");
-      return;
-    }
-    if (ruleData.newExtension && !/^[a-zA-Z0-9]+$/.test(ruleData.newExtension)) {
-      showErrorMsg("扩展名只能包含字母和数字");
-      return;
-    }
   }
 
   // 检查文件名冲突和非法字符
@@ -2309,77 +2339,102 @@ async function executeRename(filePaths, activeTabId, ruleData) {
     (f) => filePaths.includes(f.path) && f.writable === false
   );
   if (skippedFiles.length > 0) {
-    showErrorMsg(`${skippedFiles.length} 个文件因无写权限被跳过`, false);
+    showErrorMsg(`${skippedFiles.length} 个文件因无写权限被跜过`, false);
   }
   if (filesToRename.length === 0) {
     showErrorMsg("所选文件均无写权限，无法重命名");
     return;
   }
+
   try {
+    // 构建规则对象
     let backendRule = {};
     if (activeTabId === "replace") {
       backendRule = {
         type: "replace",
-        find: ruleData.find,
+        find: ruleData.find || "",
         replace: ruleData.replace || "",
+        regex: ruleData.regex || false,
+        case_sensitive: ruleData.caseSensitive || false,
       };
     } else if (activeTabId === "sequence") {
       backendRule = {
         type: "sequence",
-        start: ruleData.start,
-        digits: ruleData.digits,
-        position: ruleData.position,
+        start: parseInt(ruleData.start) || 1,
+        step: parseInt(ruleData.step) || 1,
+        width: parseInt(ruleData.digits) || 2,
+        order: ruleData.order || "current",
       };
     } else if (activeTabId === "slice") {
       backendRule = {
         type: "slice",
-        start: ruleData.start,
-        end: ruleData.end,
+        start: parseInt(ruleData.start) || 0,
+        end: ruleData.end !== null && ruleData.end !== undefined ? parseInt(ruleData.end) : null,
         replacement: ruleData.replacement || "",
-        preserveExtension: ruleData.preserveExtension !== false,
       };
     } else if (activeTabId === "case") {
       backendRule = {
         type: "case",
-        mode: ruleData.caseType, // "upper" | "lower" | "title" | "snake" | "kebab"
-        preserveExtension: ruleData.preserveExtension !== false,
+        caseType: ruleData.caseType || "lower",
       };
     } else if (activeTabId === "extension") {
       backendRule = {
         type: "extension",
-        mode: ruleData.mode, // "change" | "remove" | "add"
-        newExtension: ruleData.newExtension || "",
-        forceChange: ruleData.forceChange || false,
-        preserveCase: ruleData.preserveCase !== false,
+        new_extension: ruleData.newExtension || null,
+        keep_original: ruleData.keepOriginal || false,
       };
     }
 
     console.log("🚀 [前端日志] 构建的后端规则:", backendRule);
-    console.log("🚀 [前端日志] 即将调用 invoke('execute_rename')");
 
-    const result = await invoke("execute_rename", {
-      filePaths: filePaths,
+    // 先调用预览接口获取新文件名
+    const previewResult = await invoke("preview_rename", {
+      files: filePaths,
       rule: backendRule,
+    });
+
+    console.log("🚀 [前端日志] 预览结果:", previewResult);
+
+    // 构建操作列表
+    const operations = [];
+    for (let i = 0; i < filePaths.length; i++) {
+      const filePath = filePaths[i];
+      const preview = previewResult[i];
+      
+      if (preview && !preview.error_message && preview.new_name !== preview.original_name) {
+        operations.push({
+          old_path: filePath,
+          new_name: preview.new_name,
+        });
+      }
+    }
+
+    if (operations.length === 0) {
+      showErrorMsg("没有文件需要重命名");
+      return;
+    }
+
+    console.log("🚀 [前端日志] 即将调用 invoke('execute_rename_batch')");
+
+    const result = await invoke("execute_rename_batch", {
+      operations: operations,
     });
 
     console.log("🚀 [前端日志] 后端返回结果:", result);
 
-    if (result.success) {
-      if (result.renamed_count > 0) {
-        showErrorMsg(`成功重命名 ${result.renamed_count} 个文件`, true);
-        // 保存撤销信息
-
-        
-        // 更新文件列表中的文件名，而不是清空列表
-        updateFileNamesAfterRename(result.renamed_files);
-        updateFileTable();
-        updateFileCount();
-      } else {
-        showErrorMsg(result.error_message || "没有文件需要重命名");
-      }
-    } else {
-      showErrorMsg(`重命名失败: ${result.error_message || "未知错误"}`);
+    if (result.success_count > 0) {
+      showErrorMsg(`成功重命名 ${result.success_count} 个文件`, true);
+      
+      // 更新文件列表中的文件名
+      updateFileNamesAfterRename(result.operations);
+      updateFileTable();
+      updateFileCount();
     }
+    
+    if (result.failed_count > 0) {
+      showErrorMsg(`${result.failed_count} 个文件重命名失败`);
+    }
+
   } catch (error) {
     console.error("❌ [前端日志] 调用后端失败:", error);
     console.error("❌ [前端日志] 错误详情:", error.message);

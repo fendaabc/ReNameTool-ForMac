@@ -3,22 +3,52 @@ html[data-theme="light"] {
   --fg: #222;
   --panel: #fff;
   --border: #e0e0e0;
+  --primary: #0e8cfb;
+  --primary-rgb: 14, 140, 251;
+  --secondary: #6c757d;
+  --success: #28a745;
+  --warning: #ffc107;
+  --danger: #dc3545;
+  --focus-ring: rgba(14, 140, 251, 0.25);
 }
 html[data-theme="purelight"] {
   --bg: #fff;
   --fg: #222;
   --panel: #fff;
   --border: #f0f0f0;
+  --primary: #0e8cfb;
+  --primary-rgb: 14, 140, 251;
+  --secondary: #6c757d;
+  --success: #28a745;
+  --warning: #ffc107;
+  --danger: #dc3545;
+  --focus-ring: rgba(14, 140, 251, 0.25);
 }
 html[data-theme="dark"] {
   --bg: #181c20;
   --fg: #e6eaf2;
   --panel: #23272e;
   --border: #2c313a;
+  --primary: #6ac6ff;
+  --primary-rgb: 106, 198, 255;
+  --secondary: #adb5bd;
+  --success: #20c997;
+  --warning: #ffc107;
+  --danger: #e74c3c;
+  --focus-ring: rgba(106, 198, 255, 0.25);
 }
 body, html {
   background: var(--bg) !important;
   color: var(--fg) !important;
+}
+
+/* 主题切换过渡效果 */
+html.theme-transition,
+html.theme-transition *,
+html.theme-transition *:before,
+html.theme-transition *:after {
+  transition: background-color 0.3s ease, color 0.3s ease, border-color 0.3s ease, box-shadow 0.3s ease !important;
+  transition-delay: 0s !important;
 }
 main, section, aside, .tab-group, .tab-content, table, thead, tbody, tr, td, th, input, textarea, select, button {
   background: var(--panel) !important;
@@ -41,72 +71,272 @@ aside .tab-content {
   padding-left: 0 !important;
 }
 
-/* 单选样式与可点击性 */
-/* 单选样式与可点击性 - 调试增强版 */
+/* 单选和复选框样式增强 - 改进可见性 */
 input[type="radio"], input[type="checkbox"] {
-  -webkit-appearance: auto;
-  -moz-appearance: auto;
-  appearance: auto;
-  width: 20px;
-  height: 20px;
-  border: 2px solid #007bff;
-  border-radius: 50%;
-  margin: 0 8px 0 0;
+  -webkit-appearance: none;
+  -moz-appearance: none;
+  appearance: none;
+  width: 22px;
+  height: 22px;
+  border: 3px solid var(--pico-primary, #007bff);
+  margin: 0 12px 0 0;
   position: relative;
   cursor: pointer;
   outline: none;
   vertical-align: middle;
-  background: white;
+  background: var(--pico-background-color, white);
   transition: all 0.2s ease;
+  flex-shrink: 0;
+  /* 增强可见性 - 更明显的边框和阴影 */
+  box-shadow: 0 0 0 2px rgba(0, 123, 255, 0.3), inset 0 2px 4px rgba(0, 0, 0, 0.1);
+  /* 确保在所有主题下都有足够的对比度 */
+  min-width: 22px;
+  min-height: 22px;
+  /* 增强触摸友好性 */
+  touch-action: manipulation;
+}
+
+input[type="radio"] {
+  border-radius: 50%;
+}
+
+input[type="checkbox"] {
+  border-radius: 4px;
 }
 
 input[type="radio"]:checked {
-  background: #007bff;
-  border-color: #007bff;
-  box-shadow: inset 0 0 0 3px white;
+  background: var(--pico-primary, #007bff);
+  border-color: var(--pico-primary, #007bff);
 }
 
-fieldset label {
-  display: flex;
-  align-items: center;
-  gap: 0.55rem;
+input[type="radio"]:checked::after {
+  content: '';
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: white;
+  /* 增强选中状态的可见性 */
+  box-shadow: 0 0 0 3px var(--pico-primary, #007bff), 0 0 6px rgba(0, 123, 255, 0.4);
+  /* 确保在所有主题下都清晰可见 */
+  border: 1px solid var(--pico-primary, #007bff);
+}
+
+input[type="checkbox"]:checked {
+  background: var(--pico-primary, #007bff);
+  border-color: var(--pico-primary, #007bff);
+}
+
+input[type="checkbox"]:checked::after {
+  content: '✓';
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  color: white;
+  font-size: 14px;
+  font-weight: 900;
+  line-height: 1;
+  /* 增强复选框勾选标记的可见性 */
+  text-shadow: 0 2px 4px rgba(0, 0, 0, 0.6), 0 0 6px rgba(0, 0, 0, 0.4);
+  /* 确保勾选标记在所有主题下都清晰可见 */
+  filter: drop-shadow(0 0 2px rgba(0, 0, 0, 0.9));
+  /* 添加边框增强对比度 */
+  -webkit-text-stroke: 0.5px rgba(0, 0, 0, 0.3);
+}
+
+/* 焦点样式 - 增强可访问性 */
+input[type="radio"]:focus-visible,
+input[type="checkbox"]:focus-visible {
+  outline: 4px solid var(--pico-primary, #007bff);
+  outline-offset: 4px;
+  box-shadow: 0 0 0 8px rgba(0, 123, 255, 0.4);
+  border-color: var(--pico-primary, #007bff);
+  /* 增强焦点环的可见性 */
+  border-width: 4px;
+  transform: scale(1.1);
+}
+
+/* 悬停样式 - 增强反馈 */
+input[type="radio"]:hover:not(:disabled),
+input[type="checkbox"]:hover:not(:disabled) {
+  border-color: var(--pico-primary, #007bff);
+  box-shadow: 0 0 0 3px rgba(0, 123, 255, 0.15);
+  transform: scale(1.05);
+}
+
+/* 禁用状态 */
+input[type="radio"]:disabled,
+input[type="checkbox"]:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* 暗色主题适配 */
+html[data-theme="dark"] input[type="radio"],
+html[data-theme="dark"] input[type="checkbox"] {
+  background: var(--pico-background-color, #23272e);
+  border-color: #6ac6ff;
+  /* 暗色主题下增强边框可见性 */
+  border-width: 2px;
+  box-shadow: 0 0 0 1px rgba(106, 198, 255, 0.3), inset 0 1px 2px rgba(255, 255, 255, 0.1);
+}
+
+html[data-theme="dark"] input[type="radio"]:checked,
+html[data-theme="dark"] input[type="checkbox"]:checked {
+  background: #6ac6ff;
+  border-color: #6ac6ff;
+  /* 暗色主题下选中状态的增强效果 */
+  box-shadow: 0 0 0 2px #6ac6ff, 0 0 8px rgba(106, 198, 255, 0.4);
+}
+
+/* 暗色主题下的选中标记优化 */
+html[data-theme="dark"] input[type="radio"]:checked::after {
+  background: #23272e;
+  box-shadow: 0 0 0 3px #6ac6ff, 0 0 6px rgba(106, 198, 255, 0.6);
+  border: 1px solid #6ac6ff;
+}
+
+html[data-theme="dark"] input[type="checkbox"]:checked::after {
+  color: #23272e;
+  text-shadow: 0 2px 4px rgba(106, 198, 255, 0.9), 0 0 6px rgba(106, 198, 255, 0.7);
+  filter: drop-shadow(0 0 3px rgba(106, 198, 255, 0.9));
+  -webkit-text-stroke: 0.5px rgba(106, 198, 255, 0.5);
+}
+
+/* Switch控件样式（如果需要） */
+input[type="checkbox"].switch {
+  width: 48px;
+  height: 24px;
+  border-radius: 12px;
+  background: var(--pico-secondary, #6c757d);
+  border: 2px solid var(--pico-secondary, #6c757d);
+  position: relative;
   cursor: pointer;
-  user-select: none;
-  padding: 8px 0; /* 移除左右内边距，保持垂直内边距 */
-  border-radius: 6px;
-  transition: background 0.2s;
-  margin: 4px 0;
+  transition: all 0.3s ease;
+}
+
+input[type="checkbox"].switch:checked {
+  background: var(--pico-primary, #007bff);
+  border-color: var(--pico-primary, #007bff);
+}
+
+input[type="checkbox"].switch::after {
+  content: '';
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: white;
+  transition: all 0.3s ease;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+}
+
+input[type="checkbox"].switch:checked::after {
+  left: 26px;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.3);
+}
+
+/* Switch在暗色主题下的样式 */
+html[data-theme="dark"] input[type="checkbox"].switch {
+  background: #495057;
+  border-color: #495057;
+}
+
+html[data-theme="dark"] input[type="checkbox"].switch:checked {
+  background: #6ac6ff;
+  border-color: #6ac6ff;
+}
+
+html[data-theme="dark"] input[type="checkbox"].switch::after {
+  background: #e6eaf2;
+}
+
+/* Switch焦点样式 */
+input[type="checkbox"].switch:focus-visible {
+  outline: 3px solid var(--pico-primary, #007bff);
+  outline-offset: 3px;
+  box-shadow: 0 0 0 6px rgba(var(--pico-primary-rgb, 0, 123, 255), 0.25);
 }
 
 fieldset {
-  border: none; /* 移除 fieldset 边框 */
-  padding: 0; /* 移除 fieldset 内边距 */
-  margin: 0; /* 移除 fieldset 外边距 */
+  border: 1px solid rgba(var(--primary-rgb), 0.3);
+  border-radius: 8px;
+  padding: 1rem;
+  margin: 1rem 0;
+  background: rgba(var(--primary-rgb), 0.02);
+  transition: border-color 0.2s ease, background-color 0.2s ease;
+}
+
+fieldset:focus-within {
+  border-color: var(--primary);
+  background: rgba(var(--primary-rgb), 0.05);
+}
+
+fieldset legend {
+  color: var(--primary);
+  font-weight: 600;
+  padding: 0 0.5rem;
+  font-size: 0.9em;
+  background: var(--panel);
+}
+
+fieldset label {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.5rem;
+  cursor: pointer;
+  user-select: none;
+  padding: 8px 12px;
+  border-radius: 6px;
+  transition: background 0.2s, border 0.2s;
+  margin: 4px 0;
+  border: 1px solid transparent;
+  position: relative;
 }
 
 fieldset label:hover {
-  background: rgba(0, 123, 255, 0.1);
+  background: rgba(var(--primary-rgb), 0.08);
+  border-color: rgba(var(--primary-rgb), 0.2);
 }
-fieldset label {
-  display: flex;
-  align-items: center;
-  gap: 0.55rem;
-  cursor: pointer;
-  user-select: none;
+
+fieldset label:focus-within {
+  background: rgba(var(--primary-rgb), 0.1);
+  border-color: var(--primary);
+  outline: 2px solid var(--primary);
+  outline-offset: 1px;
 }
+
+/* 改进label的可访问性 */
+fieldset label:has(input:checked) {
+  background: rgba(var(--primary-rgb), 0.12);
+  border-color: rgba(var(--primary-rgb), 0.3);
+  font-weight: 500;
+}
+
+/* 暗色主题下的fieldset样式已通过CSS变量统一处理 */
 
 
 
 /* 强化右侧单选控件的点击优先级，避免被左侧滚动层等覆盖 */
 #tab-sequence fieldset,
-#tab-case fieldset {
+#tab-case fieldset,
+#tab-extension fieldset {
   position: relative;
   z-index: 1000;
 }
 #tab-sequence label,
 #tab-case label,
+#tab-extension label,
 #tab-sequence input[type="radio"],
-#tab-case input[type="radio"] {
+#tab-case input[type="radio"],
+#tab-extension input[type="radio"],
+#tab-extension input[type="checkbox"] {
   position: relative;
   z-index: 1001;
   pointer-events: auto !important;
@@ -301,6 +531,133 @@ tbody tr {
   font-weight: 500;
   transition: background 0.18s, color 0.18s, border 0.18s;
   box-shadow: none !important;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+/* Tab组容器响应式 - 改进窄屏适配 */
+.tab-group {
+  display: flex;
+  gap: 0.3rem;
+  flex-wrap: nowrap;
+  overflow-x: auto;
+  scrollbar-width: thin;
+  -webkit-overflow-scrolling: touch;
+  padding-bottom: 4px; /* 为滚动条留空间 */
+  /* 改进滚动行为 */
+  scroll-behavior: smooth;
+  -webkit-scroll-behavior: smooth;
+  /* 确保在窄屏下不会溢出 */
+  max-width: 100%;
+  /* 添加渐变遮罩效果，指示可滚动 */
+  position: relative;
+}
+
+/* 滚动指示器 - 左右渐变遮罩 */
+.tab-group::before,
+.tab-group::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  bottom: 4px; /* 避免覆盖滚动条 */
+  width: 20px;
+  pointer-events: none;
+  z-index: 1;
+  opacity: 0;
+  transition: opacity 0.3s ease;
+}
+
+.tab-group::before {
+  left: 0;
+  background: linear-gradient(to right, var(--pico-background-color), transparent);
+}
+
+.tab-group::after {
+  right: 0;
+  background: linear-gradient(to left, var(--pico-background-color), transparent);
+}
+
+/* 当内容可滚动时显示渐变指示器 */
+.tab-group.scrollable::before,
+.tab-group.scrollable::after {
+  opacity: 1;
+}
+
+.tab-group::-webkit-scrollbar {
+  height: 4px;
+}
+
+.tab-group::-webkit-scrollbar-track {
+  background: rgba(0,0,0,0.08);
+  border-radius: 3px;
+}
+
+.tab-group::-webkit-scrollbar-thumb {
+  background: var(--pico-primary, #007bff);
+  border-radius: 3px;
+  transition: background 0.2s;
+}
+
+.tab-group::-webkit-scrollbar-thumb:hover {
+  background: #0056b3;
+}
+
+/* 暗色主题下的滚动条 */
+html[data-theme="dark"] .tab-group::-webkit-scrollbar-track {
+  background: rgba(255,255,255,0.1);
+}
+
+html[data-theme="dark"] .tab-group::-webkit-scrollbar-thumb {
+  background: #6ac6ff;
+}
+
+html[data-theme="dark"] .tab-group::-webkit-scrollbar-thumb:hover {
+  background: #4fb3ff;
+}
+
+/* Tab组滚动指示器样式 */
+.scroll-indicator {
+  position: absolute;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 24px;
+  height: 24px;
+  background: var(--pico-primary);
+  color: white;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  font-size: 14px;
+  font-weight: bold;
+  z-index: 10;
+  opacity: 0;
+  transition: opacity 0.3s ease, background 0.2s ease;
+  pointer-events: auto;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+}
+
+.scroll-indicator:hover {
+  background: var(--pico-primary-hover, #0056b3);
+  transform: translateY(-50%) scale(1.1);
+}
+
+.scroll-indicator-left {
+  left: 4px;
+}
+
+.scroll-indicator-right {
+  right: 4px;
+}
+
+/* 当Tab组可滚动时显示指示器 */
+.tab-group.scrollable .scroll-indicator {
+  opacity: 0.8;
+}
+
+.tab-group.scrollable .scroll-indicator:hover {
+  opacity: 1;
 }
 .tab-link.active {
   background: #0e8cfb !important;
@@ -341,36 +698,76 @@ html[data-theme="dark"] .tab-link:not(.active):hover {
   border-bottom: 3px solid #0e8cfb !important;
 }
 
-/* 主题切换按钮样式 */
+/* 主题切换按钮样式 - 改进一致性 */
 #theme-toggle {
-  background: #f6f6f6 !important;
+  background: var(--pico-background-color, #f6f6f6) !important;
   border-radius: 50% !important;
-  border: 1.5px solid #0e8cfb !important;
-  box-shadow: 0 1px 8px 0 rgba(80,80,80,0.07);
-  width: 36px; height: 36px;
-  display: flex; align-items: center; justify-content: center;
-  transition: border 0.2s, background 0.2s;
+  border: 2px solid var(--pico-primary, #0e8cfb) !important;
+  box-shadow: 0 2px 12px 0 rgba(80,80,80,0.1);
+  width: 40px; 
+  height: 40px;
+  display: flex; 
+  align-items: center; 
+  justify-content: center;
+  transition: all 0.2s ease;
+  position: relative;
+  overflow: hidden;
 }
 html[data-theme="purelight"] #theme-toggle {
   background: #fff !important;
   border: 1.5px solid #0e8cfb !important;
 }
 #theme-toggle:hover {
-  border: 1.5px solid #0e8cfb !important;
-  background: #e4f0fa !important;
+  border: 2px solid var(--pico-primary, #0e8cfb) !important;
+  background: rgba(var(--pico-primary-rgb, 14, 140, 251), 0.1) !important;
+  transform: scale(1.05);
+  box-shadow: 0 4px 16px 0 rgba(80,80,80,0.15);
 }
 #theme-toggle svg {
-  width: 24px; height: 24px;
-  color: #0e8cfb;
-  filter: drop-shadow(0 0 1.5px #fff);
+  width: 24px; 
+  height: 24px;
+  color: var(--primary);
+  transition: all 0.3s ease;
+  filter: drop-shadow(0 0 2px rgba(255,255,255,0.5));
+  /* 添加旋转动画效果 */
+  transform-origin: center;
+}
+
+/* 主题切换时的旋转动画 */
+#theme-toggle.switching svg {
+  transform: rotate(180deg) scale(1.1);
+}
+
+/* 悬停时的微动画 */
+#theme-toggle:hover svg {
+  transform: scale(1.1);
+  filter: drop-shadow(0 0 4px rgba(255,255,255,0.8));
+}
+
+#theme-toggle:focus-visible {
+  outline: 3px solid var(--pico-primary, #0e8cfb);
+  outline-offset: 3px;
+  box-shadow: 0 0 0 6px rgba(var(--pico-primary-rgb, 14, 140, 251), 0.25);
 }
 html[data-theme="dark"] #theme-toggle {
-  background: rgba(40,44,54,0.92) !important;
-  border: 1.5px solid #2c313a !important;
+  background: var(--pico-background-color, #23272e) !important;
+  border: 2px solid #6ac6ff !important;
+  box-shadow: 0 2px 12px 0 rgba(0,0,0,0.3);
 }
+
+html[data-theme="dark"] #theme-toggle:hover {
+  background: rgba(106, 198, 255, 0.1) !important;
+  border: 2px solid #6ac6ff !important;
+}
+
 html[data-theme="dark"] #theme-toggle svg {
   color: #ffd700;
-  filter: drop-shadow(0 0 2px #23272e);
+  filter: drop-shadow(0 0 3px rgba(0,0,0,0.5));
+}
+
+html[data-theme="dark"] #theme-toggle:focus-visible {
+  outline: 3px solid #6ac6ff;
+  box-shadow: 0 0 0 6px rgba(106, 198, 255, 0.25);
 }
 
 /* 修复语法：移除一段游离的声明块 */
@@ -560,14 +957,105 @@ button {
   display: block;
 }
 
-/* 焦点样式增强 */
+/* 焦点样式增强 - 可访问性优化 */
 button:focus-visible,
 input:focus-visible,
+select:focus-visible,
+textarea:focus-visible,
 .tab-link:focus-visible,
 .sortable:focus-visible {
-  outline: 2px solid var(--pico-primary);
+  outline: 2px solid var(--primary);
   outline-offset: 2px;
-  box-shadow: 0 0 0 4px rgba(var(--pico-primary-rgb), 0.2);
+  box-shadow: 0 0 0 4px var(--focus-ring);
+}
+
+/* radio和checkbox的焦点样式 */
+input[type="radio"]:focus-visible,
+input[type="checkbox"]:focus-visible {
+  outline: 3px solid var(--primary);
+  outline-offset: 3px;
+  box-shadow: 0 0 0 6px var(--focus-ring);
+  border-color: var(--primary);
+}
+
+
+
+/* 跳过链接（可访问性） */
+.skip-link {
+  position: absolute;
+  top: -40px;
+  left: 6px;
+  background: var(--pico-primary, #007bff);
+  color: white;
+  padding: 8px;
+  text-decoration: none;
+  border-radius: 4px;
+  z-index: 10000;
+  transition: top 0.2s;
+}
+
+.skip-link:focus {
+  top: 6px;
+}
+
+/* 键盘导航指示器 */
+.keyboard-navigation-active *:focus {
+  outline: 2px solid var(--primary) !important;
+  outline-offset: 2px !important;
+}
+
+/* 键盘导航检测 - 当用户使用键盘时显示更明显的焦点 */
+body.using-keyboard *:focus {
+  outline: 3px solid var(--primary) !important;
+  outline-offset: 3px !important;
+  box-shadow: 0 0 0 6px var(--focus-ring) !important;
+}
+
+/* 鼠标用户隐藏焦点轮廓 */
+body.using-mouse *:focus:not(:focus-visible) {
+  outline: none !important;
+  box-shadow: none !important;
+}
+
+/* 高对比度模式增强 */
+@media (prefers-contrast: high) {
+  input[type="radio"], input[type="checkbox"] {
+    border-width: 3px;
+    box-shadow: 0 0 0 2px rgba(0, 0, 0, 0.3), inset 0 1px 3px rgba(0, 0, 0, 0.2);
+  }
+  
+  button, input, select, textarea {
+    border-width: 2px;
+    box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.2);
+  }
+  
+  .tab-link.active {
+    border-bottom-width: 4px;
+    box-shadow: 0 0 0 2px var(--pico-primary);
+  }
+  
+  /* 增强焦点指示器 */
+  *:focus-visible {
+    outline-width: 3px !important;
+    outline-offset: 3px !important;
+  }
+  
+  /* 增强主题切换按钮的对比度 */
+  #theme-toggle {
+    border-width: 3px !important;
+  }
+  
+  /* 增强预览高亮的对比度 */
+  .preview-cell.preview-highlight {
+    border: 3px solid var(--pico-primary) !important;
+    background: rgba(var(--pico-primary-rgb), 0.2) !important;
+  }
+  
+  .file-row-conflict,
+  .file-row-invalid {
+    border: 3px solid #c00 !important;
+    background: rgba(220, 53, 69, 0.2) !important;
+  }
 }
 
 /* 表头可排序样式 */
@@ -618,6 +1106,214 @@ input:focus-visible,
   
   button, .tab-link, input, .sortable {
     transition: none;
+  }
+  
+  input[type="radio"]:hover:not(:disabled),
+  input[type="checkbox"]:hover:not(:disabled) {
+    transform: none;
+  }
+  
+  /* 禁用主题切换动画 */
+  html.theme-transition,
+  html.theme-transition *,
+  html.theme-transition *:before,
+  html.theme-transition *:after {
+    transition: none !important;
+  }
+  
+  /* 禁用主题切换按钮动画 */
+  #theme-toggle svg {
+    transition: none;
+  }
+  
+  #theme-toggle.switching svg {
+    transform: none;
+  }
+  
+  #theme-toggle:hover svg {
+    transform: none;
+  }
+}
+
+/* 平板设备优化 (601px - 1024px) */
+@media (min-width: 601px) and (max-width: 1024px) {
+  .toolbar {
+    padding: 0.75rem 1rem;
+  }
+  
+  .toolbar .right-group button {
+    font-size: 0.95rem;
+    padding: 0.6rem 1rem;
+  }
+  
+  .tab-link {
+    font-size: 0.9em;
+    padding: 0.5em 1em;
+  }
+  
+  /* 平板上的表格优化 */
+  table {
+    font-size: 0.9em;
+  }
+  
+  th, td {
+    padding: 0.6rem 0.8rem;
+  }
+  
+  /* 平板上的输入框优化 */
+  input, select, textarea {
+    font-size: 1rem;
+    padding: 0.7rem 1rem;
+  }
+  
+  /* 平板上的radio/checkbox优化 */
+  input[type="radio"], input[type="checkbox"] {
+    width: 22px;
+    height: 22px;
+  }
+}
+
+/* 超窄屏幕适配 (< 480px) */
+@media (max-width: 480px) {
+  .toolbar {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 0.75rem;
+    padding: 0.75rem 0.5rem;
+  }
+  
+  .toolbar .left-group {
+    justify-content: center;
+  }
+  
+  .toolbar .right-group {
+    justify-content: center;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+  }
+  
+  .toolbar .right-group button {
+    flex: 1;
+    min-width: 80px;
+    /* 确保触摸友好 */
+    min-height: 44px;
+    padding: 0.6rem 0.8rem;
+    font-size: 0.9rem;
+  }
+  
+  #theme-toggle {
+    flex: 0 0 auto !important;
+    min-width: 44px !important;
+    width: 44px !important;
+    height: 44px !important;
+  }
+  
+  /* Tab链接在超窄屏幕下更紧凑但保持触摸友好 */
+  .tab-link {
+    font-size: 0.8em;
+    padding: 0.5em 0.8em;
+    min-height: 44px;
+    min-width: 60px;
+    /* 改进触摸体验 */
+    touch-action: manipulation;
+  }
+  
+  /* 表格在超窄屏幕下的优化 */
+  table {
+    font-size: 0.85em;
+  }
+  
+  th, td {
+    padding: 0.5rem 0.4rem;
+  }
+  
+  /* 确保所有交互元素都触摸友好 */
+  button, .tab-link, input[type="radio"], input[type="checkbox"] {
+    min-height: 44px; /* 触摸友好的最小高度 */
+    touch-action: manipulation;
+  }
+  
+  /* 增大radio和checkbox的触摸区域 */
+  input[type="radio"], input[type="checkbox"] {
+    width: 26px;
+    height: 26px;
+    margin: 0 14px 0 0;
+  }
+  
+  /* 输入框在超窄屏幕下的优化 */
+  input, select, textarea {
+    font-size: 16px; /* 防止iOS缩放 */
+    min-height: 44px;
+    padding: 0.75rem 1rem;
+  }
+  
+  /* 改进fieldset在窄屏下的布局 */
+  fieldset {
+    padding: 0.75rem;
+    margin: 0.75rem 0;
+  }
+  
+  fieldset label {
+    padding: 0.75rem 0.5rem;
+    margin: 0.25rem 0;
+    /* 增大点击区域 */
+    min-height: 44px;
+    display: flex;
+    align-items: center;
+  }
+  
+  /* 状态栏在窄屏下的优化 */
+  .status-bar {
+    flex-direction: column;
+    gap: 0.5rem;
+    text-align: center;
+  }
+  
+  .status-bar .status-left {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: 0.5rem;
+  }
+  
+  .status-bar .status-left span {
+    margin-right: 0;
+    font-size: 0.9em;
+  }
+  
+  /* 主内容区域在窄屏下的优化 */
+  main {
+    padding: 0.5rem;
+    gap: 1rem;
+  }
+  
+  /* 文件列表在窄屏下的优化 */
+  .file-list-scroll {
+    max-height: 50vh;
+  }
+  
+  /* 右侧面板在窄屏下的优化 */
+  aside {
+    padding: 1rem 0.5rem;
+  }
+  
+  /* Tab组在窄屏下的滚动优化 */
+  .tab-group {
+    padding-bottom: 6px;
+    margin-bottom: 0.5rem;
+  }
+  
+  /* 改进窄屏下的按钮布局 */
+  .toolbar .right-group {
+    display: grid;
+    grid-template-columns: 1fr 1fr auto;
+    gap: 0.5rem;
+    align-items: center;
+  }
+  
+  .toolbar .right-group button:not(#theme-toggle) {
+    min-width: 0;
+    padding: 0.5rem 0.75rem;
   }
 }
 

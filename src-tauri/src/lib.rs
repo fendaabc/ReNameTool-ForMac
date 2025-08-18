@@ -1,7 +1,10 @@
 use std::fs;
-use std::path::{Path, PathBuf};
-use std::collections::HashMap;
+use std::path::Path;
 use serde::{Deserialize, Serialize};
+use uuid::Uuid;
+
+mod rules;
+use rules::*;
 
 
 // 添加日志宏
@@ -25,36 +28,11 @@ struct FileInfo {
     path: String,
 }
 
-#[derive(Serialize, Deserialize)]
-struct RenameOperation {
-    old_path: String,
-    new_name: String,
-}
 
-#[derive(Serialize, Deserialize)]
-struct RenameResult {
-    success: bool,
-    count: usize,
-    error: Option<String>,
-}
 
-#[derive(Serialize, Deserialize, Debug)]
-struct ExecuteRenameResult {
-    success: bool,
-    renamed_count: usize,
-    error_message: Option<String>,
-}
+// 旧的结构体已移动到rules.rs模块中
 
-#[derive(Serialize, Deserialize, Debug)]
-#[serde(tag = "type")]
-pub enum RenameRule {
-    #[serde(rename = "replace")]
-    Replace { find: String, replace: String },
-    #[serde(rename = "sequence")]
-    Sequence { start: usize, digits: usize, position: String },
-    #[serde(rename = "case")]
-    Case { #[serde(rename = "caseType")] case_type: String },
-}
+
 
 #[derive(Serialize, Deserialize)]
 struct FilePermission {
@@ -208,250 +186,194 @@ fn collect_files_from_dir(dir: &Path) -> Result<Vec<String>, std::io::Error> {
     Ok(files)
 }
 
-#[tauri::command]
-async fn select_files() -> Result<Vec<FileInfo>, String> {
-    // 由于 Tauri 2.0 的文件对话框 API 变化，这里返回一个示例
-    // 实际使用时需要配置文件系统权限
-    Ok(vec![
-        FileInfo {
-            name: "示例文件1.txt".to_string(),
-            path: "/path/to/示例文件1.txt".to_string(),
-        },
-        FileInfo {
-            name: "示例文件2.jpg".to_string(),
-            path: "/path/to/示例文件2.jpg".to_string(),
-        },
-    ])
-}
 
+
+
+
+/// 预览重命名结果（纯函数式，不触盘）
 #[tauri::command]
-async fn rename_files(operations: Vec<RenameOperation>) -> Result<RenameResult, String> {
-    let mut success_count = 0;
-    let mut last_error = None;
+async fn preview_rename(files: Vec<String>, rule: RenameRule) -> Result<Vec<PreviewResult>, String> {
+    log_info!("🦀 [后端日志] preview_rename 被调用");
+    log_info!("🦀 [后端日志] 文件数量: {}", files.len());
+    log_info!("🦀 [后端日志] 规则: {:?}", rule);
     
-    for operation in operations {
-        let old_path = Path::new(&operation.old_path);
+    // 验证规则参数
+    if let Err(e) = rule.validate() {
+        log_error!("🦀 [后端日志] 规则验证失败: {}", e);
+        return Err(e);
+    }
+    
+    let mut results = Vec::new();
+    let mut new_names = Vec::new();
+    
+    // 为每个文件生成预览结果
+    for (index, file_path) in files.iter().enumerate() {
+        let path = Path::new(file_path);
+        let original_name = path
+            .file_name()
+            .and_then(|n| n.to_str())
+            .unwrap_or("")
+            .to_string();
         
-        if !old_path.exists() {
-            last_error = Some(format!("文件不存在: {}", operation.old_path));
-            continue;
-        }
-        
-        let parent_dir = old_path.parent().unwrap_or(Path::new("."));
-        let new_path = parent_dir.join(&operation.new_name);
-        
-        match fs::rename(&old_path, &new_path) {
-            Ok(_) => success_count += 1,
+        match rule.apply_to_filename(&original_name, index) {
+            Ok(new_name) => {
+                new_names.push(new_name.clone());
+                results.push(PreviewResult {
+                    original_name: original_name.clone(),
+                    new_name: new_name.clone(),
+                    has_conflict: false, // 稍后检测
+                    has_invalid_chars: rules::has_invalid_chars(&new_name),
+                    error_message: None,
+                });
+            }
             Err(e) => {
-                last_error = Some(format!("重命名失败 {}: {}", operation.old_path, e));
+                results.push(PreviewResult {
+                    original_name: original_name.clone(),
+                    new_name: original_name.clone(),
+                    has_conflict: false,
+                    has_invalid_chars: false,
+                    error_message: Some(e),
+                });
+                new_names.push(original_name);
             }
         }
     }
     
-    Ok(RenameResult {
-        success: last_error.is_none(),
-        count: success_count,
-        error: last_error,
+    // 检测冲突
+    let conflicts = rules::detect_conflicts(&new_names);
+    for (i, result) in results.iter_mut().enumerate() {
+        if i < conflicts.len() {
+            result.has_conflict = conflicts[i];
+        }
+    }
+    
+    log_info!("🦀 [后端日志] 预览生成完成，结果数量: {}", results.len());
+    Ok(results)
+}
+
+/// 批量执行重命名操作（两阶段改名）
+#[tauri::command]
+async fn execute_rename_batch(operations: Vec<RenameOperation>) -> Result<BatchRenameResult, String> {
+    log_info!("🦀 [后端日志] execute_rename_batch 被调用");
+    log_info!("🦀 [后端日志] 操作数量: {}", operations.len());
+    
+    if operations.is_empty() {
+        return Ok(BatchRenameResult {
+            success_count: 0,
+            failed_count: 0,
+            operations: Vec::new(),
+            operation_id: Uuid::new_v4().to_string(),
+        });
+    }
+    
+    // 权限和路径校验
+    for operation in &operations {
+        let path = Path::new(&operation.old_path);
+        
+        if !path.exists() {
+            return Err(format!("文件不存在: {}", operation.old_path));
+        }
+        
+        if !path.is_file() {
+            return Err(format!("路径不是文件: {}", operation.old_path));
+        }
+        
+        // 检查写权限
+        if let Ok(metadata) = path.metadata() {
+            if metadata.permissions().readonly() {
+                return Err(format!("文件只读，无法重命名: {}", operation.old_path));
+            }
+        }
+    }
+    
+    let operation_id = Uuid::new_v4().to_string();
+    let mut results = Vec::new();
+    let mut success_count = 0;
+    let mut failed_count = 0;
+    
+    // 两阶段重命名：先重命名为临时名，再重命名为目标名
+    let mut temp_operations = Vec::new();
+    
+    // 第一阶段：重命名为临时名
+    for operation in &operations {
+        let old_path = Path::new(&operation.old_path);
+        let parent_dir = old_path.parent().unwrap_or(Path::new("."));
+        let temp_name = format!("__temp_{}_{}", operation_id, old_path.file_name().unwrap().to_str().unwrap());
+        let temp_path = parent_dir.join(&temp_name);
+        
+        match fs::rename(&old_path, &temp_path) {
+            Ok(_) => {
+                log_info!("🦀 [后端日志] 第一阶段成功: {:?} -> {:?}", old_path, temp_path);
+                temp_operations.push((temp_path, parent_dir.join(&operation.new_name), operation.clone()));
+            }
+            Err(e) => {
+                let error_msg = format!("第一阶段重命名失败: {}", e);
+                log_error!("🦀 [后端日志] {}", error_msg);
+                results.push(RenameOperationResult {
+                    old_path: operation.old_path.clone(),
+                    new_path: parent_dir.join(&operation.new_name).to_string_lossy().to_string(),
+                    success: false,
+                    error_message: Some(error_msg),
+                });
+                failed_count += 1;
+            }
+        }
+    }
+    
+    // 第二阶段：重命名为目标名
+    for (temp_path, target_path, original_operation) in temp_operations {
+        match fs::rename(&temp_path, &target_path) {
+            Ok(_) => {
+                log_info!("🦀 [后端日志] 第二阶段成功: {:?} -> {:?}", temp_path, target_path);
+                results.push(RenameOperationResult {
+                    old_path: original_operation.old_path.clone(),
+                    new_path: target_path.to_string_lossy().to_string(),
+                    success: true,
+                    error_message: None,
+                });
+                success_count += 1;
+            }
+            Err(e) => {
+                let error_msg = format!("第二阶段重命名失败: {}", e);
+                log_error!("🦀 [后端日志] {}", error_msg);
+                
+                // 尝试回滚第一阶段
+                if let Err(rollback_err) = fs::rename(&temp_path, &original_operation.old_path) {
+                    log_error!("🦀 [后端日志] 回滚失败: {}", rollback_err);
+                }
+                
+                results.push(RenameOperationResult {
+                    old_path: original_operation.old_path.clone(),
+                    new_path: target_path.to_string_lossy().to_string(),
+                    success: false,
+                    error_message: Some(error_msg),
+                });
+                failed_count += 1;
+            }
+        }
+    }
+    
+    log_info!("🦀 [后端日志] 批量重命名完成，成功: {}，失败: {}", success_count, failed_count);
+    
+    Ok(BatchRenameResult {
+        success_count,
+        failed_count,
+        operations: results,
+        operation_id,
     })
 }
 
-
-
+/// 单批次撤销接口（v3.0版本）
 #[tauri::command]
-async fn execute_rename(file_paths: Vec<String>, rule: RenameRule) -> Result<ExecuteRenameResult, String> {
-    log_info!("🦀 [后端日志] execute_rename 被调用");
-    log_info!("🦀 [后端日志] 文件路径数量: {}", file_paths.len());
-    log_info!("🦀 [后端日志] 文件路径: {:?}", file_paths);
-    log_info!("🦀 [后端日志] 重命名规则: {:?}", rule);
+async fn undo_rename(operation_id: String) -> Result<UndoResult, String> {
+    log_info!("🦀 [后端日志] undo_rename 被调用，operation_id: {}", operation_id);
     
-    if file_paths.is_empty() {
-        log_error!("🦀 [后端日志] 没有提供文件路径");
-        return Ok(ExecuteRenameResult {
-            success: false,
-            renamed_count: 0,
-            error_message: Some("没有提供文件路径".to_string()),
-        });
-    }
-
-    // 第一步：验证所有文件是否存在
-    log_info!("🦀 [后端日志] 开始验证文件是否存在");
-    for file_path in &file_paths {
-        let path = Path::new(file_path);
-        if !path.exists() {
-            log_error!("🦀 [后端日志] 文件不存在: {}", file_path);
-            return Ok(ExecuteRenameResult {
-                success: false,
-                renamed_count: 0,
-                error_message: Some(format!("文件不存在: {}", file_path)),
-            });
-        }
-        if !path.is_file() {
-            log_error!("🦀 [后端日志] 路径不是文件: {}", file_path);
-            return Ok(ExecuteRenameResult {
-                success: false,
-                renamed_count: 0,
-                error_message: Some(format!("路径不是文件: {}", file_path)),
-            });
-        }
-    }
-    log_info!("🦀 [后端日志] 所有文件验证通过");
-
-    // 生成新文件名并处理重复
-    log_info!("🦀 [后端日志] 开始生成新文件名");
-    let mut rename_map: Vec<(PathBuf, PathBuf)> = Vec::new();
-    let mut new_name_counts: HashMap<String, usize> = HashMap::new();
-
-    match rule {
-        RenameRule::Replace { find, replace } => {
-            log_info!("🦀 [后端日志] 处理替换规则: '{}' -> '{}'", find, replace);
-            for file_path in &file_paths {
-                let old_path = PathBuf::from(file_path);
-                let parent_dir = old_path.parent().unwrap_or(Path::new("."));
-                let file_name = old_path.file_name().and_then(|n| n.to_str()).unwrap_or("");
-                let new_base_name = file_name.replace(&find, &replace);
-                log_info!("🦀 [后端日志] 文件 '{}' -> '{}'", file_name, new_base_name);
-                if new_base_name == file_name {
-                    log_info!("🦀 [后端日志] 文件名无变化，跳过: {}", file_name);
-                    continue;
-                }
-                let final_new_name = resolve_duplicate_name(&new_base_name, &mut new_name_counts);
-                let new_path = parent_dir.join(&final_new_name);
-                log_info!("🦀 [后端日志] 添加到重命名映射: {:?} -> {:?}", old_path, new_path);
-                rename_map.push((old_path, new_path));
-            }
-        }
-        RenameRule::Sequence { start, digits, position } => {
-            let mut seq = start;
-            for file_path in &file_paths {
-                let old_path = PathBuf::from(file_path);
-                let parent_dir = old_path.parent().unwrap_or(Path::new("."));
-                let file_name = old_path.file_name().and_then(|n| n.to_str()).unwrap_or("");
-                let (name, ext) = if let Some(dot) = file_name.rfind('.') {
-                    (&file_name[..dot], &file_name[dot..])
-                } else {
-                    (file_name, "")
-                };
-                let seq_str = format!("{:0width$}", seq, width = digits);
-                let new_base_name = match position.as_str() {
-                    "prefix" => format!("{}_{}", seq_str, file_name),
-                    "suffix" => format!("{}_{}{}", name, seq_str, ext),
-                    _ => format!("{}_{}{}", name, seq_str, ext),
-                };
-                let final_new_name = resolve_duplicate_name(&new_base_name, &mut new_name_counts);
-                let new_path = parent_dir.join(&final_new_name);
-                rename_map.push((old_path, new_path));
-                seq += 1;
-            }
-        }
-        RenameRule::Case { case_type } => {
-            for file_path in &file_paths {
-                let old_path = PathBuf::from(file_path);
-                let parent_dir = old_path.parent().unwrap_or(Path::new("."));
-                let file_name = old_path.file_name().and_then(|n| n.to_str()).unwrap_or("");
-                let (name, ext) = if let Some(dot) = file_name.rfind('.') {
-                    (&file_name[..dot], &file_name[dot..])
-                } else {
-                    (file_name, "")
-                };
-                let new_base_name = match case_type.as_str() {
-                    "upper" => format!("{}{}", name.to_uppercase(), ext),
-                    "lower" => format!("{}{}", name.to_lowercase(), ext),
-                    "capitalize" => {
-                        let mut c = name.chars();
-                        match c.next() {
-                            None => String::new(),
-                            Some(f) => format!("{}{}{}", f.to_uppercase(), c.as_str().to_lowercase(), ext),
-                        }
-                    }
-                    _ => format!("{}{}", name, ext),
-                };
-                if new_base_name == file_name {
-                    continue;
-                }
-                let final_new_name = resolve_duplicate_name(&new_base_name, &mut new_name_counts);
-                let new_path = parent_dir.join(&final_new_name);
-                rename_map.push((old_path, new_path));
-            }
-        }
-    }
-
-    log_info!("🦀 [后端日志] 生成的重命名映射数量: {}", rename_map.len());
-    
-    if rename_map.is_empty() {
-        log_info!("🦀 [后端日志] 没有文件需要重命名");
-        return Ok(ExecuteRenameResult {
-            success: true,
-            renamed_count: 0,
-            error_message: Some("没有文件需要重命名".to_string()),
-        });
-    }
-
-    // 第三步：执行重命名操作
-    log_info!("🦀 [后端日志] 开始执行重命名操作");
-    let mut success_count = 0;
-    let mut errors = Vec::new();
-    let mut op_history: Vec<(String, String)> = Vec::new();
-
-    for (old_path, new_path) in rename_map {
-        log_info!("🦀 [后端日志] 重命名: {:?} -> {:?}", old_path, new_path);
-        match fs::rename(&old_path, &new_path) {
-            Ok(_) => {
-                success_count += 1;
-                log_info!("🦀 [后端日志] 重命名成功: {:?} -> {:?}", old_path, new_path);
-                op_history.push((old_path.to_string_lossy().to_string(), new_path.to_string_lossy().to_string()));
-            },
-            Err(e) => {
-                let error_msg = format!("重命名失败 {}: {}", old_path.display(), e);
-                log_error!("🦀 [后端日志] {}", error_msg);
-                errors.push(error_msg);
-            }
-        }
-    }
-
-
-
-    let result = if errors.is_empty() {
-        log_info!("🦀 [后端日志] 重命名操作完成，成功: {}", success_count);
-        ExecuteRenameResult {
-            success: true,
-            renamed_count: success_count,
-            error_message: None,
-        }
-    } else {
-        log_error!("🦀 [后端日志] 重命名操作完成，成功: {}，错误: {}", success_count, errors.len());
-        ExecuteRenameResult {
-            success: false,
-            renamed_count: success_count,
-            error_message: Some(errors.join("; ")),
-        }
-    };
-    
-    log_info!("🦀 [后端日志] 返回结果: {:?}", result);
-    Ok(result)
+    // TODO: 实现撤销逻辑
+    // v3.0版本暂时返回未实现错误
+    Err("撤销功能将在后续版本中实现".to_string())
 }
 
-// 辅助函数：处理重复文件名
-fn resolve_duplicate_name(base_name: &str, name_counts: &mut HashMap<String, usize>) -> String {
-    // 分离文件名和扩展名
-    let (name_without_ext, extension) = if let Some(dot_pos) = base_name.rfind('.') {
-        let name_part = &base_name[..dot_pos];
-        let ext_part = &base_name[dot_pos..];
-        (name_part, ext_part)
-    } else {
-        (base_name, "")
-    };
 
-    // 检查是否已经存在这个文件名
-    let count = name_counts.entry(base_name.to_string()).or_insert(0);
-    
-    if *count == 0 {
-        *count += 1;
-        base_name.to_string()
-    } else {
-        *count += 1;
-        format!("{} ({}){}", name_without_ext, *count - 1, extension)
-    }
-}
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
@@ -459,9 +381,9 @@ pub fn run() {
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_dialog::init())
         .invoke_handler(tauri::generate_handler![
-            select_files, 
-            rename_files, 
-            execute_rename, 
+            preview_rename,
+            execute_rename_batch,
+            undo_rename,
             get_files_from_paths, 
             list_files,
             check_file_permission,

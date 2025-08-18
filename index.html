@@ -78,6 +78,76 @@ aside {
     max-width: 100%;
     width: 100%;
   }
+  
+  /* 工具栏响应式 */
+  .toolbar {
+    flex-wrap: wrap;
+    gap: 0.5rem;
+  }
+  
+  .toolbar .right-group {
+    flex-wrap: wrap;
+    gap: 0.3rem;
+  }
+  
+  .toolbar .right-group button {
+    font-size: 0.9em;
+    padding: 0.4rem 0.8rem;
+  }
+}
+
+@media (max-width: 600px) {
+  /* Tab组响应式 */
+  .tab-group {
+    overflow-x: auto;
+    scrollbar-width: thin;
+    -webkit-overflow-scrolling: touch;
+  }
+  
+  .tab-group::-webkit-scrollbar {
+    height: 4px;
+  }
+  
+  .tab-group::-webkit-scrollbar-track {
+    background: rgba(0,0,0,0.1);
+    border-radius: 2px;
+  }
+  
+  .tab-group::-webkit-scrollbar-thumb {
+    background: var(--pico-primary);
+    border-radius: 2px;
+  }
+  
+  .tab-link {
+    white-space: nowrap;
+    min-width: auto;
+    font-size: 0.8em;
+    padding: 0.35em 0.8em;
+  }
+  
+  /* 工具栏进一步优化 */
+  .toolbar h3 {
+    font-size: 1.1em;
+  }
+  
+  .toolbar .right-group {
+    width: 100%;
+    justify-content: space-between;
+  }
+  
+  /* 改进按钮组布局 */
+  .toolbar .right-group button {
+    min-width: 44px; /* 确保触摸友好的最小尺寸 */
+    padding: 0.4rem 0.6rem;
+  }
+  
+  /* 主题切换按钮保持圆形 */
+  #theme-toggle {
+    min-width: 40px !important;
+    width: 40px !important;
+    height: 40px !important;
+    flex-shrink: 0 !important;
+  }
 }
       .tab-content {
         display: none;
@@ -117,14 +187,15 @@ aside {
     <link rel="stylesheet" href="src/styles.css" />
   </head>
   <body>
+    <a href="#main-content" class="skip-link">跳转到主要内容</a>
     <header class="toolbar">
       <div class="left-group">
         <img src="src-tauri/icons/32x32.png" alt="logo" style="width:40px;height:40px;">
         <h3 style="margin: 0;">文件批量重命名</h3>
       </div>
       <div class="right-group">
-        <button id="apply-rename-top" class="primary-action" title="开始重命名" aria-label="开始重命名选中的文件" aria-describedby="file-count">开始重命名</button>
-        <button id="clear-all-top" class="danger-action" title="清空列表" aria-label="清空所有文件和规则设置">清空</button>
+        <button id="apply-rename-top" class="primary-action" title="开始重命名" aria-label="开始重命名选中的文件" aria-describedby="file-count" aria-keyshortcuts="Ctrl+Enter">开始重命名</button>
+        <button id="clear-all-top" class="danger-action" title="清空列表" aria-label="清空所有文件和规则设置" aria-keyshortcuts="Ctrl+Shift+C">清空</button>
         <button id="open-settings" class="secondary-action" title="设置" aria-label="打开全局设置">设置</button>
         <button id="show-shortcuts" class="secondary-action" title="键盘快捷键" aria-label="显示键盘快捷键帮助">快捷键</button>
         <button id="theme-toggle" style="background: none; border: none; cursor: pointer; opacity: 0.9;">
@@ -136,7 +207,7 @@ aside {
     </header>
 
 
-    <main>
+    <main id="main-content">
       <section style="display: flex; flex-direction: column; height:100%;">
         <div id="drop-zone" class="card-group" style="border:2px dashed var(--pico-primary);border-radius:13px;padding:1.5rem 1rem;margin-bottom:1.2rem;background:#fafdff;display:flex;flex-direction:column;align-items:center;gap:0.85rem;transition:background 0.18s;">
   <div style="display:flex;gap:0.7rem;">
@@ -144,8 +215,29 @@ aside {
     <button id="select-folder-btn" class="outline" aria-label="选择包含要重命名文件的文件夹">选择文件夹</button>
   </div>
   <span style="font-size:0.98em;color:var(--pico-primary);font-weight:500;">可拖拽文件/文件夹或点击按钮导入</span>
-
 </div>
+
+<!-- 搜索和过滤区域 -->
+<div id="search-filter-section" style="margin-bottom:1rem;display:none;">
+  <div style="display:grid;grid-template-columns:1fr auto auto;gap:0.8rem;align-items:end;">
+    <div>
+      <label for="search-input" style="font-size:0.9em;margin-bottom:0.3rem;display:block;">搜索文件</label>
+      <input type="text" id="search-input" placeholder="按文件名或扩展名搜索..." aria-describedby="search-help" style="margin-bottom:0;">
+      <small id="search-help" class="form-text" style="margin-top:0.2rem;">支持模糊匹配，实时过滤</small>
+    </div>
+    <div>
+      <label for="extension-filter" style="font-size:0.9em;margin-bottom:0.3rem;display:block;">文件类型</label>
+      <select id="extension-filter" aria-describedby="filter-help" style="margin-bottom:0;">
+        <option value="">所有类型</option>
+      </select>
+      <small id="filter-help" class="form-text" style="margin-top:0.2rem;">按扩展名过滤</small>
+    </div>
+    <div>
+      <button id="clear-search" class="outline secondary" style="margin-bottom:0;" title="清除搜索条件" aria-label="清除所有搜索和过滤条件">清除</button>
+    </div>
+  </div>
+</div>
+
 <hr style="margin:0.6rem 0 1.1rem 0;border:0;border-top:1.5px dashed #e0e8ef;">
 
         <div style="flex: 1; display: flex; flex-direction: column;">
@@ -396,14 +488,43 @@ aside {
           </div>
         </div>
         <div style="display: flex; gap: 1rem; margin-top: 1rem;">
-  <button id="apply-rename" class="primary-action" style="flex:1; white-space: nowrap;">执行重命名</button>
-  <button id="clear-all" class="danger-action" style="flex:1; white-space: nowrap;">全部清空</button>
+  <button id="apply-rename" class="primary-action" style="flex:1; white-space: nowrap;" aria-label="执行重命名操作" aria-keyshortcuts="Ctrl+Enter">执行重命名</button>
+  <button id="clear-all" class="danger-action" style="flex:1; white-space: nowrap;" aria-label="清空所有文件和设置" aria-keyshortcuts="Ctrl+Shift+C">全部清空</button>
 </div>
 
       </aside>
 
     </main>
 
+    <!-- 底部状态栏 -->
+    <footer class="status-bar">
+      <div class="status-left">
+        <span id="status-total">总计: 0 个文件</span>
+        <span id="status-selected">已选: 0 个</span>
+        <span id="status-changed">将变更: 0 个</span>
+        <span id="status-conflicts" style="color: var(--pico-del-color); display: none;">冲突: 0 个</span>
+        <span id="status-invalid" style="color: var(--pico-del-color); display: none;">非法: 0 个</span>
+      </div>
+      <div class="status-right">
+        <div id="status-progress-container" style="display: none; align-items: center; gap: 0.5rem;">
+          <progress id="status-progress-bar" value="0" max="100" style="width: 120px; height: 8px;"></progress>
+          <span id="status-progress-text">0%</span>
+        </div>
+        <span id="status-progress" style="display: none;">处理中...</span>
+        <span id="status-info">就绪</span>
+      </div>
+    </footer>
+    
+    <!-- 引入主题管理器 -->
+    <script src="src/theme-manager.js"></script>
+    <!-- 引入搜索过滤管理器 -->
+    <script src="src/search-filter-manager.js"></script>
+    <!-- 引入预览管理器 -->
+    <script src="src/preview-manager.js"></script>
+    <!-- 引入状态栏管理器 -->
+    <script src="src/status-bar-manager.js"></script>
+    <!-- 引入操作控制器 -->
+    <script src="src/action-controls.js"></script>
     
     <script>
       console.log("🚀 开始设置应用");
@@ -488,16 +609,7 @@ aside {
           // 尝试设置拖拽（可能不工作）
           await setupDragDrop();
 
-          // 顶部工具栏按钮联动
-          const topStartBtn = document.getElementById("apply-rename-top");
-          const asideStartBtn = document.getElementById("apply-rename");
-          if (topStartBtn && asideStartBtn) {
-            topStartBtn.addEventListener("click", () => asideStartBtn.click());
-          }
-          const topClearBtn = document.getElementById("clear-all-top");
-          if (topClearBtn) {
-            topClearBtn.addEventListener("click", () => clearAll());
-          }
+          // 顶部工具栏按钮联动现在由ActionControls处理
           const settingsBtn = document.getElementById("open-settings");
           if (settingsBtn) {
             settingsBtn.addEventListener("click", () => alert("设置面板开发中"));
@@ -506,6 +618,69 @@ aside {
           const shortcutsBtn = document.getElementById("show-shortcuts");
           if (shortcutsBtn) {
             shortcutsBtn.addEventListener("click", showKeyboardShortcuts);
+          }
+          
+          // 定义键盘快捷键帮助函数
+          function showKeyboardShortcuts() {
+            const shortcuts = [
+              { key: 'Ctrl+A / Cmd+A', desc: '全选文件' },
+              { key: 'Ctrl+D / Cmd+D', desc: '取消全选' },
+              { key: 'Delete / Backspace', desc: '删除选中文件' },
+              { key: 'Ctrl+Enter / Cmd+Enter', desc: '开始重命名' },
+              { key: 'Ctrl+Shift+C / Cmd+Shift+C', desc: '清空列表' },
+              { key: 'F5', desc: '刷新预览' },
+              { key: 'F2', desc: '开始重命名（如有选中文件）' },
+              { key: 'Escape', desc: '取消操作或关闭对话框' },
+              { key: '↑/↓', desc: '导航文件列表' },
+              { key: 'Space', desc: '切换文件选择状态' },
+              { key: 'Home/End', desc: '跳转到第一个/最后一个文件' },
+              { key: 'Shift+点击', desc: '范围选择文件' }
+            ];
+            
+            const shortcutList = shortcuts.map(s => 
+              `<tr><td style="font-family: monospace; font-weight: bold; padding: 0.5rem;">${s.key}</td><td style="padding: 0.5rem;">${s.desc}</td></tr>`
+            ).join('');
+            
+            const dialog = `
+              <div id="shortcuts-dialog" style="position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.5); display: flex; align-items: center; justify-content: center; z-index: 10000;">
+                <div style="background: var(--pico-background-color, #fff); border-radius: 12px; padding: 2rem; max-width: 600px; max-height: 80vh; overflow-y: auto;">
+                  <h3 style="margin-top: 0; color: var(--pico-primary);">键盘快捷键</h3>
+                  <table style="width: 100%; border-collapse: collapse;">
+                    <thead>
+                      <tr style="border-bottom: 2px solid #ddd;">
+                        <th style="text-align: left; padding: 0.5rem;">快捷键</th>
+                        <th style="text-align: left; padding: 0.5rem;">功能</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      ${shortcutList}
+                    </tbody>
+                  </table>
+                  <div style="text-align: right; margin-top: 2rem;">
+                    <button onclick="document.getElementById('shortcuts-dialog').remove()" style="padding: 0.75rem 1.5rem;">关闭</button>
+                  </div>
+                </div>
+              </div>
+            `;
+            
+            document.body.insertAdjacentHTML('beforeend', dialog);
+            
+            // 点击遮罩关闭
+            const dialogEl = document.getElementById('shortcuts-dialog');
+            dialogEl.addEventListener('click', (e) => {
+              if (e.target === dialogEl) {
+                dialogEl.remove();
+              }
+            });
+            
+            // ESC键关闭
+            const handleEsc = (e) => {
+              if (e.key === 'Escape') {
+                dialogEl.remove();
+                document.removeEventListener('keydown', handleEsc);
+              }
+            };
+            document.addEventListener('keydown', handleEsc);
           }
         });
 
@@ -533,119 +708,8 @@ aside {
           }
         });
 
-        // 执行重命名按钮事件
-        console.log("📋 [HTML] setupButtons 完成，apply-rename按钮:", applyRenameBtn);
-        
-        applyRenameBtn.addEventListener("click", async () => {
-          console.log("🚀 [HTML] 点击了执行重命名按钮");
-          
-          // 直接从DOM检查是否有文件
-          const fileRows = document.querySelectorAll("#file-table-body tr:not(#empty-tip-row)");
-          console.log("🚀 [HTML] 找到的文件行数:", fileRows.length);
-          
-          if (fileRows.length === 0) {
-            console.log("❌ [HTML] 没有找到文件，显示提示");
-            alert("请先选择文件");
-            return;
-          }
-          
-          // 等待main.js加载完成
-          let retryCount = 0;
-          while (!window.getLoadedFiles && retryCount < 10) {
-            console.log("⏳ [HTML] 等待main.js加载...", retryCount);
-            await new Promise(resolve => setTimeout(resolve, 100));
-            retryCount++;
-          }
-          
-          if (!window.getLoadedFiles) {
-            console.error("❌ [HTML] main.js未加载完成，使用备用方案");
-            alert("系统未完全加载，请稍后重试");
-            return;
-          }
-          
-          const loadedFiles = window.getLoadedFiles();
-          console.log("🚀 [HTML] loadedFiles:", loadedFiles);
-          
-          // 获取当前标签页
-          const activeTab = document.querySelector(".tab-content.active");
-          if (!activeTab) {
-            alert("无法识别当前激活的标签页");
-            return;
-          }
-          
-          const activeTabId = activeTab.id.replace("tab-", "");
-          console.log("🚀 [HTML] 当前标签页:", activeTabId);
-          
-          // 等待executeRename函数加载
-          let executeRetryCount = 0;
-          while (!window.executeRename && executeRetryCount < 20) {
-            console.log("⏳ [HTML] 等待executeRename函数加载...", executeRetryCount);
-            await new Promise(resolve => setTimeout(resolve, 50));
-            executeRetryCount++;
-          }
-          
-          // 调用main.js中的executeRename函数
-          if (window.executeRename) {
-            const filePaths = loadedFiles.map(f => f.path);
-            let ruleData = {};
-            
-            switch (activeTabId) {
-              case "replace":
-                ruleData = {
-                  find: document.getElementById("find").value,
-                  replace: document.getElementById("replace").value,
-                };
-                break;
-              case "sequence":
-                const positionElement = document.querySelector('input[name="position"]:checked');
-                ruleData = {
-                  start: parseInt(document.getElementById("start").value) || 1,
-                  digits: parseInt(document.getElementById("digits").value) || 2,
-                  position: positionElement ? positionElement.value : "prefix",
-                };
-                break;
-              case "slice":
-                ruleData = {
-                  start: parseInt(document.getElementById("slice-start").value) || 0,
-                  end: document.getElementById("slice-end").value ? parseInt(document.getElementById("slice-end").value) : null,
-                  replacement: document.getElementById("slice-replacement").value || "",
-                  preserveExtension: document.getElementById("slice-preserve-extension").checked
-                };
-                break;
-              case "case":
-                const checked = document.querySelector('#tab-case input[name="caseType"]:checked');
-                const preserveExtCheckbox = document.getElementById('case-preserve-extension');
-                ruleData = { 
-                  caseType: checked ? checked.value : "",
-                  preserveExtension: preserveExtCheckbox ? preserveExtCheckbox.checked : true
-                };
-                break;
-              case "extension":
-                const modeChecked = document.querySelector('input[name="extensionMode"]:checked');
-                const newExtInput = document.getElementById('new-extension');
-                const forceChangeChk = document.getElementById('ext-force-change');
-                const preserveCaseChk = document.getElementById('ext-case-preserve');
-                ruleData = {
-                  mode: modeChecked ? modeChecked.value : "",
-                  newExtension: newExtInput ? newExtInput.value.trim() : "",
-                  forceChange: forceChangeChk ? forceChangeChk.checked : false,
-                  preserveCase: preserveCaseChk ? preserveCaseChk.checked : true
-                };
-                break;
-            }
-            
-            console.log("🚀 [HTML] 调用executeRename:", { filePaths, activeTabId, ruleData });
-            await window.executeRename(filePaths, activeTabId, ruleData);
-          } else {
-            console.error("❌ [HTML] executeRename函数加载超时");
-            alert("系统未完全加载，请刷新页面重试");
-          }
-        });
-
-        // 清空按钮
-        clearAllBtn.addEventListener("click", () => {
-          clearAll();
-        });
+        // 按钮事件现在由ActionControls处理
+        console.log("📋 [HTML] setupButtons 完成，按钮事件由ActionControls处理");
 
         // 实时预览 - 为所有输入控件添加
         const findInput = document.getElementById("find");
@@ -1121,11 +1185,6 @@ aside {
       }
     </script>
   <script src="src/virtual-scroll.js"></script>
-  <script src="src/replace-rule.js"></script>
-  <script src="src/sequence-rule.js"></script>
-  <script src="src/slice-rule.js"></script>
-  <script src="src/case-rule.js"></script>
-  <script src="src/extension-rule.js"></script>
   <script type="module" src="src/main.js"></script>
 
   <!-- 底部状态栏 -->
