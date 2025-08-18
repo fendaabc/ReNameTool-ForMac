@@ -1,7 +1,8 @@
 use std::fs;
-use std::path::Path;
+use std::path::{Path, PathBuf};
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
+use tauri_plugin_store::Store;
 
 mod rules;
 use rules::*;
@@ -251,9 +252,18 @@ async fn preview_rename(files: Vec<String>, rule: RenameRule) -> Result<Vec<Prev
     Ok(results)
 }
 
-/// 批量执行重命名操作（两阶段改名）
+use std::sync::atomic::{AtomicUsize, Ordering};
+use std::sync::Arc;
+use tokio::fs as async_fs;
+use tokio::task;
+use futures::future::join_all;
+
+/// 批量执行重命名操作（两阶段并发重命名）
 #[tauri::command]
-async fn execute_rename_batch(operations: Vec<RenameOperation>) -> Result<BatchRenameResult, String> {
+async fn execute_rename_batch(
+    app_handle: tauri::AppHandle,
+    operations: Vec<RenameOperation>,
+) -> Result<BatchRenameResult, String> {
     log_info!("🦀 [后端日志] execute_rename_batch 被调用");
     log_info!("🦀 [后端日志] 操作数量: {}", operations.len());
     
@@ -265,112 +275,285 @@ async fn execute_rename_batch(operations: Vec<RenameOperation>) -> Result<BatchR
             operation_id: Uuid::new_v4().to_string(),
         });
     }
-    
-    // 权限和路径校验
-    for operation in &operations {
-        let path = Path::new(&operation.old_path);
+
+    // 生成唯一操作ID
+    let operation_id = Uuid::new_v4().to_string();
+    let results = Arc::new(tokio::sync::Mutex::new(Vec::with_capacity(operations.len())));
+    let success_count = Arc::new(AtomicUsize::new(0));
+    let failed_count = Arc::new(AtomicUsize::new(0));
+
+    // 验证所有文件
+    for op in &operations {
+        let path = Path::new(&op.old_path);
         
         if !path.exists() {
-            return Err(format!("文件不存在: {}", operation.old_path));
+            return Err(format!("文件不存在: {}", op.old_path));
         }
         
         if !path.is_file() {
-            return Err(format!("路径不是文件: {}", operation.old_path));
+            return Err(format!("路径不是文件: {}", op.old_path));
         }
         
-        // 检查写权限
         if let Ok(metadata) = path.metadata() {
             if metadata.permissions().readonly() {
-                return Err(format!("文件只读，无法重命名: {}", operation.old_path));
+                return Err(format!("文件只读，无法重命名: {}", op.old_path));
             }
         }
     }
     
-    let operation_id = Uuid::new_v4().to_string();
-    let mut results = Vec::new();
-    let mut success_count = 0;
-    let mut failed_count = 0;
-    
-    // 两阶段重命名：先重命名为临时名，再重命名为目标名
-    let mut temp_operations = Vec::new();
-    
-    // 第一阶段：重命名为临时名
-    for operation in &operations {
-        let old_path = Path::new(&operation.old_path);
-        let parent_dir = old_path.parent().unwrap_or(Path::new("."));
-        let temp_name = format!("__temp_{}_{}", operation_id, old_path.file_name().unwrap().to_str().unwrap());
-        let temp_path = parent_dir.join(&temp_name);
+    // 第一阶段：并发重命名为临时名
+    let phase1_futures = operations.into_iter().map(|op| {
+        let results = Arc::clone(&results);
+        let success_count = Arc::clone(&success_count);
+        let failed_count = Arc::clone(&failed_count);
         
-        match fs::rename(&old_path, &temp_path) {
-            Ok(_) => {
-                log_info!("🦀 [后端日志] 第一阶段成功: {:?} -> {:?}", old_path, temp_path);
-                temp_operations.push((temp_path, parent_dir.join(&operation.new_name), operation.clone()));
-            }
-            Err(e) => {
-                let error_msg = format!("第一阶段重命名失败: {}", e);
-                log_error!("🦀 [后端日志] {}", error_msg);
-                results.push(RenameOperationResult {
-                    old_path: operation.old_path.clone(),
-                    new_path: parent_dir.join(&operation.new_name).to_string_lossy().to_string(),
-                    success: false,
-                    error_message: Some(error_msg),
-                });
-                failed_count += 1;
-            }
-        }
-    }
-    
-    // 第二阶段：重命名为目标名
-    for (temp_path, target_path, original_operation) in temp_operations {
-        match fs::rename(&temp_path, &target_path) {
-            Ok(_) => {
-                log_info!("🦀 [后端日志] 第二阶段成功: {:?} -> {:?}", temp_path, target_path);
-                results.push(RenameOperationResult {
-                    old_path: original_operation.old_path.clone(),
-                    new_path: target_path.to_string_lossy().to_string(),
-                    success: true,
-                    error_message: None,
-                });
-                success_count += 1;
-            }
-            Err(e) => {
-                let error_msg = format!("第二阶段重命名失败: {}", e);
-                log_error!("🦀 [后端日志] {}", error_msg);
-                
-                // 尝试回滚第一阶段
-                if let Err(rollback_err) = fs::rename(&temp_path, &original_operation.old_path) {
-                    log_error!("🦀 [后端日志] 回滚失败: {}", rollback_err);
+        task::spawn_blocking(move || {
+            let old_path = Path::new(&op.old_path);
+            let parent_dir = old_path.parent().unwrap_or_else(|| Path::new("."));
+            
+            // 生成更安全的临时文件名
+            let temp_name = format!(".__temp_{}_{}_{}", 
+                operation_id, 
+                std::time::SystemTime::now()
+                    .duration_since(std::time::UNIX_EPOCH)
+                    .unwrap_or_default()
+                    .as_millis(),
+                old_path.file_name()
+                    .and_then(|s| s.to_str())
+                    .unwrap_or("file")
+            );
+            
+            let temp_path = parent_dir.join(&temp_name);
+            let target_path = parent_dir.join(&op.new_name);
+            
+            // 执行重命名
+            match std::fs::rename(&old_path, &temp_path) {
+                Ok(_) => {
+                    log_info!("🦀 [后端日志] 第一阶段成功: {:?} -> {:?}", old_path, temp_path);
+                    Some((temp_path, target_path, op))
                 }
-                
-                results.push(RenameOperationResult {
-                    old_path: original_operation.old_path.clone(),
-                    new_path: target_path.to_string_lossy().to_string(),
-                    success: false,
-                    error_message: Some(error_msg),
-                });
-                failed_count += 1;
+                Err(e) => {
+                    let error_msg = format!("第一阶段重命名失败: {}", e);
+                    log_error!("🦀 [后端日志] {}", error_msg);
+                    
+                    let mut results = results.blocking_lock();
+                    results.push(RenameOperationResult {
+                        old_path: op.old_path.clone(),
+                        new_path: target_path.to_string_lossy().to_string(),
+                        success: false,
+                        error_message: Some(error_msg),
+                    });
+                    failed_count.fetch_add(1, Ordering::SeqCst);
+                    None
+                }
+            }
+        })
+    });
+
+    // 等待所有第一阶段操作完成
+    let phase1_results = join_all(phase1_futures).await;
+    
+    // 收集成功的临时重命名操作
+    let mut temp_operations = Vec::new();
+    for result in phase1_results {
+        match result {
+            Ok(Some(op)) => temp_operations.push(op),
+            Ok(None) => continue, // 错误已在第一阶段处理
+            Err(e) => {
+                log_error!("🦀 [后端日志] 任务执行错误: {}", e);
+                failed_count.fetch_add(1, Ordering::SeqCst);
             }
         }
     }
     
-    log_info!("🦀 [后端日志] 批量重命名完成，成功: {}，失败: {}", success_count, failed_count);
+    // 第二阶段：并发重命名为目标名
+    let phase2_futures = temp_operations.into_iter().map(|(temp_path, target_path, op)| {
+        let results = Arc::clone(&results);
+        let success_count = Arc::clone(&success_count);
+        let failed_count = Arc::clone(&failed_count);
+        
+        task::spawn_blocking(move || {
+            match std::fs::rename(&temp_path, &target_path) {
+                Ok(_) => {
+                    log_info!("🦀 [后端日志] 第二阶段成功: {:?} -> {:?}", temp_path, target_path);
+                    
+                    let mut results = results.blocking_lock();
+                    results.push(RenameOperationResult {
+                        old_path: op.old_path.clone(),
+                        new_path: target_path.to_string_lossy().to_string(),
+                        success: true,
+                        error_message: None,
+                    });
+                    success_count.fetch_add(1, Ordering::SeqCst);
+                }
+                Err(e) => {
+                    let error_msg = format!("第二阶段重命名失败: {}", e);
+                    log_error!("🦀 [后端日志] {}", error_msg);
+                    
+                    // 尝试回滚第一阶段
+                    if let Err(rollback_err) = std::fs::rename(&temp_path, &op.old_path) {
+                        log_error!("🦀 [后端日志] 回滚失败: {}", rollback_err);
+                    }
+                    
+                    let mut results = results.blocking_lock();
+                    results.push(RenameOperationResult {
+                        old_path: op.old_path.clone(),
+                        new_path: target_path.to_string_lossy().to_string(),
+                        success: false,
+                        error_message: Some(error_msg),
+                    });
+                    failed_count.fetch_add(1, Ordering::SeqCst);
+                }
+            }
+        })
+    });
+
+    // 等待所有第二阶段操作完成
+    join_all(phase2_futures).await;
     
+    // 获取最终结果
+    let final_results = Arc::try_unwrap(results)
+        .map(|m| m.into_inner())
+        .unwrap_or_else(|_| Vec::new());
+    
+    let success = success_count.load(Ordering::SeqCst);
+    let failed = failed_count.load(Ordering::SeqCst);
+    
+    log_info!("🦀 [后端日志] 批量重命名完成，成功: {}，失败: {}", success, failed);
+    
+    // 保存操作记录到本地存储
+    let mut store = Store::new(
+        app_handle.config().tauri.bundle.identifier.clone(),
+        "rename_operations.json".into(),
+    );
+    
+    if let Err(e) = save_operation_record(&mut store, &operation_id, &final_results).await {
+        log_error!("🦀 [后端日志] 保存操作记录失败: {}", e);
+        // 不直接返回错误，因为重命名操作本身是成功的
+    }
+    
+    // 返回结果
     Ok(BatchRenameResult {
-        success_count,
-        failed_count,
-        operations: results,
+        success_count: success,
+        failed_count: failed,
+        operations: final_results,
         operation_id,
     })
 }
 
+// 定义存储操作记录的键名
+const RENAME_OPERATIONS_KEY: &str = "rename_operations";
+
+/// 保存操作记录到本地存储
+async fn save_operation_record(
+    store: &mut Store<'_>,
+    operation_id: &str,
+    results: &[RenameOperationResult],
+) -> Result<(), String> {
+    // 读取现有的操作记录
+    let mut all_operations: std::collections::HashMap<String, Vec<RenameOperationResult>> = 
+        store.get(RENAME_OPERATIONS_KEY).and_then(|v| v).unwrap_or_default();
+    
+    // 更新或添加新的操作记录
+    all_operations.insert(operation_id.to_string(), results.to_vec());
+    
+    // 保存回存储
+    store.insert(RENAME_OPERATIONS_KEY.to_string(), all_operations)
+        .map_err(|e| format!("保存操作记录失败: {}", e))?;
+    
+    // 立即保存到磁盘
+    store.save().map_err(|e| format!("保存到磁盘失败: {}", e))?;
+    
+    Ok(())
+}
+
+/// 从本地存储加载操作记录
+async fn load_operation_record(
+    store: &mut Store<'_>,
+    operation_id: &str,
+) -> Result<Vec<RenameOperationResult>, String> {
+    // 读取所有操作记录
+    let all_operations: std::collections::HashMap<String, Vec<RenameOperationResult>> = 
+        store.get(RENAME_OPERATIONS_KEY).and_then(|v| v).unwrap_or_default();
+    
+    // 获取指定ID的记录
+    all_operations.get(operation_id)
+        .cloned()
+        .ok_or_else(|| format!("找不到操作ID为 {} 的重命名记录", operation_id))
+}
+
 /// 单批次撤销接口（v3.0版本）
 #[tauri::command]
-async fn undo_rename(operation_id: String) -> Result<UndoResult, String> {
+async fn undo_rename(
+    app_handle: tauri::AppHandle,
+    operation_id: String,
+) -> Result<UndoResult, String> {
     log_info!("🦀 [后端日志] undo_rename 被调用，operation_id: {}", operation_id);
     
-    // TODO: 实现撤销逻辑
-    // v3.0版本暂时返回未实现错误
-    Err("撤销功能将在后续版本中实现".to_string())
+    // 检查操作ID是否有效
+    if operation_id.is_empty() {
+        return Err("操作ID不能为空".to_string());
+    }
+    
+    // 初始化存储
+    let mut store = Store::new(
+        app_handle.config().tauri.bundle.identifier.clone(),
+        "rename_operations.json".into(),
+    );
+    
+    // 加载操作记录
+    let operation_results = load_operation_record(&mut store, &operation_id).await?;
+    
+    let mut restored_count = 0;
+    let mut error_message = None;
+    
+    // 遍历操作结果，将文件重命名回原始名称
+    for op in operation_results {
+        if !op.success {
+            continue; // 跳过失败的操作
+        }
+        
+        let old_path = Path::new(&op.new_path);
+        let new_path = Path::new(&op.old_path);
+        
+        // 检查文件是否存在
+        if !old_path.exists() {
+            log_error!("🦀 [后端日志] 文件不存在，无法撤销: {}", op.new_path);
+            error_message = Some(format!("文件不存在: {}", op.new_path));
+            continue;
+        }
+        
+        // 检查目标路径是否已存在
+        if new_path.exists() {
+            log_error!("🦀 [后端日志] 目标文件已存在，无法撤销: {}", op.old_path);
+            error_message = Some(format!("目标文件已存在: {}", op.old_path));
+            continue;
+        }
+        
+        // 执行重命名操作
+        match std::fs::rename(old_path, new_path) {
+            Ok(_) => {
+                log_info!("🦀 [后端日志] 撤销成功: {} -> {}", op.new_path, op.old_path);
+                restored_count += 1;
+            }
+            Err(e) => {
+                log_error!("🦀 [后端日志] 撤销失败: {} -> {}: {}", op.new_path, op.old_path, e);
+                error_message = Some(format!("撤销失败: {}", e));
+            }
+        }
+    }
+    
+    // 如果所有操作都成功，可以选择删除该操作记录
+    // if restored_count > 0 && restored_count == operation_results.len() {
+    //     let _ = remove_operation_record(&mut store, &operation_id).await;
+    // }
+    
+    // 返回撤销结果
+    Ok(UndoResult {
+        success: restored_count > 0,
+        restored_count,
+        error_message,
+    })
 }
 
 
@@ -380,6 +563,7 @@ pub fn run() {
     tauri::Builder::default()
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_dialog::init())
+        .plugin(tauri_plugin_store::Builder::default().build())
         .invoke_handler(tauri::generate_handler![
             preview_rename,
             execute_rename_batch,
