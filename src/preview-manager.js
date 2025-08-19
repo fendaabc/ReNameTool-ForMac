@@ -66,6 +66,40 @@ class PreviewManager {
   }
   
   /**
+   * 刷新文件列表（用于撤销操作后）
+   */
+  async refreshFileList() {
+    console.log('🔄 [PreviewManager] 刷新文件列表');
+    
+    try {
+      // 如果有虚拟滚动管理器，则使用它来刷新
+      if (window.virtualScrollManager) {
+        window.virtualScrollManager.renderVisibleItems();
+      } else {
+        // 否则回退到常规更新
+        this.updatePreview();
+      }
+      
+      // 更新状态栏
+      if (window.statusBarManager) {
+        window.statusBarManager.update({
+          total: window.loadedFiles ? window.loadedFiles.length : 0,
+          selected: window.loadedFiles ? window.loadedFiles.filter(f => f.selected).length : 0
+        });
+      }
+      
+      // 更新操作按钮状态
+      if (window.actionControls) {
+        window.actionControls.updateButtonStates();
+      }
+      
+      console.log('✅ [PreviewManager] 文件列表刷新完成');
+    } catch (error) {
+      console.error('❌ [PreviewManager] 刷新文件列表失败:', error);
+    }
+  }
+  
+  /**
    * 执行预览更新（实际处理逻辑）
    */
   async performPreviewUpdate() {

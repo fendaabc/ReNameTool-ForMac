@@ -13,6 +13,8 @@ class ActionControls {
     this.isProcessing = false;
     this.lastOperationId = null;
     this.confirmationDialog = null;
+    this.undoStack = []; // 存储可撤销的操作
+    this.maxUndoSteps = 10; // 最大撤销步骤数
     
     this.init();
   }
@@ -26,7 +28,8 @@ class ActionControls {
       applyRenameTop: document.getElementById('apply-rename-top'),
       clearAll: document.getElementById('clear-all'),
       clearAllTop: document.getElementById('clear-all-top'),
-      selectAll: document.getElementById('select-all')
+      selectAll: document.getElementById('select-all'),
+      undoRename: document.getElementById('undo-rename')
     };
     
     // 检查元素是否存在
@@ -61,6 +64,14 @@ class ActionControls {
       this.elements.applyRename.addEventListener('click', (e) => {
         e.preventDefault();
         this.handleRenameAction();
+      });
+    }
+    
+    // 撤销按钮事件
+    if (this.elements.undoRename) {
+      this.elements.undoRename.addEventListener('click', (e) => {
+        e.preventDefault();
+        this.handleUndoAction();
       });
     }
     
@@ -112,6 +123,16 @@ class ActionControls {
       // 避免在输入框中触发
       const isTyping = this.isTypingContext(e.target);
       if (isTyping) return;
+      
+      // Ctrl+Z / Cmd+Z - 撤销操作
+      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'z' && !e.shiftKey) {
+        e.preventDefault();
+        if (this.lastOperationId && !this.isProcessing) {
+          this.handleUndoAction();
+          this.announceToScreenReader('撤销上次重命名操作');
+        }
+        return;
+      }
       
       // Ctrl+Enter / Cmd+Enter - 开始重命名
       if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') {
@@ -201,21 +222,73 @@ class ActionControls {
   }
   
   /**
+   * 处理撤销操作
+   */
+  async handleUndoAction() {
+    console.log('🎮 [ActionControls] 处理撤销操作');
+    
+    if (this.isProcessing) {
+      console.log('⚠️ [ActionControls] 操作正在进行中，忽略撤销请求');
+      return;
+    }
+    
+    if (!this.lastOperationId) {
+      console.log('⚠️ [ActionControls] 没有可撤销的操作');
+      this.showError('没有可撤销的操作');
+      return;
+    }
+    
+    this.isProcessing = true;
+    this.updateButtonStates();
+    
+    try {
+      console.log(`🔄 [ActionControls] 正在撤销操作 ID: ${this.lastOperationId}`);
+      
+      // 调用后端的撤销API
+      const result = await window.__TAURI__.invoke('undo_rename', { 
+        operationId: this.lastOperationId 
+      });
+      
+      if (result.success) {
+        console.log(`✅ [ActionControls] 成功撤销 ${result.restored_count} 个文件`);
+        this.showSuccess(`已撤销 ${result.restored_count} 个文件的重命名`);
+        
+        // 清空操作ID，防止重复撤销
+        this.lastOperationId = null;
+        
+        // 刷新文件列表
+        if (window.previewManager) {
+          await window.previewManager.refreshFileList();
+        }
+      } else {
+        console.error(`❌ [ActionControls] 撤销失败: ${result.error_message || '未知错误'}`);
+        this.showError(`撤销失败: ${result.error_message || '未知错误'}`);
+      }
+    } catch (error) {
+      console.error('❌ [ActionControls] 撤销操作出错:', error);
+      this.showError(`撤销操作出错: ${error.message || '未知错误'}`);
+    } finally {
+      this.isProcessing = false;
+      this.updateButtonStates();
+    }
+  }
+  
+  /**
    * 处理清空操作
    */
   async handleClearAction() {
-    console.log('🎮 [ActionControls] 处理清空操作');
+    console.log(' [ActionControls] 处理清空操作');
     
     const files = window.loadedFiles || [];
     if (files.length === 0) {
-      console.log('🎮 [ActionControls] 没有文件需要清空');
+      console.log(' [ActionControls] 没有文件需要清空');
       return;
     }
     
     // 显示确认对话框
     const confirmed = await this.showClearConfirmationDialog(files.length);
     if (!confirmed) {
-      console.log('🎮 [ActionControls] 用户取消了清空操作');
+      console.log(' [ActionControls] 用户取消了清空操作');
       return;
     }
     
@@ -536,6 +609,11 @@ class ActionControls {
         throw new Error('没有文件需要重命名');
       }
       
+      // 生成操作ID（时间戳）
+      const operationId = Date.now().toString();
+      this.lastOperationId = operationId;
+      console.log(`🆔 [ActionControls] 创建重命名操作 ID: ${operationId}`);
+      
       // 检查是否有实际的重命名函数可用
       if (typeof window.executeRename === 'function') {
         // 使用实际的重命名函数
@@ -749,6 +827,21 @@ class ActionControls {
       this.elements.selectAll.disabled = files.length === 0;
       this.elements.selectAll.indeterminate = selectedCount > 0 && selectedCount < files.length;
       this.elements.selectAll.checked = files.length > 0 && selectedCount === files.length;
+    }
+    
+    // 更新撤销按钮
+    if (this.elements.undoRename) {
+      const canUndo = !!this.lastOperationId && !this.isProcessing;
+      this.elements.undoRename.disabled = !canUndo;
+      this.elements.undoRename.setAttribute('aria-disabled', !canUndo);
+      this.elements.undoRename.title = canUndo ? '撤销上次重命名操作 (Ctrl+Z)' : '没有可撤销的操作';
+      
+      // 更新按钮的视觉状态
+      if (canUndo) {
+        this.elements.undoRename.classList.remove('disabled');
+      } else {
+        this.elements.undoRename.classList.add('disabled');
+      }
     }
   }
   
