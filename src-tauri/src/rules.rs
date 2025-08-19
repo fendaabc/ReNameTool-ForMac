@@ -62,7 +62,7 @@ pub struct BatchRenameResult {
 }
 
 /// 单个重命名操作结果
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct RenameOperationResult {
     pub old_path: String,
     pub new_path: String,

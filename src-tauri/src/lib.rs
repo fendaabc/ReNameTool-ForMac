@@ -1,8 +1,9 @@
 use std::fs;
-use std::path::{Path, PathBuf};
+use std::path::Path;
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
-use tauri_plugin_store::Store;
+use tauri_plugin_store::StoreExt;
+use serde_json::json;
 
 mod rules;
 use rules::*;
@@ -254,7 +255,6 @@ async fn preview_rename(files: Vec<String>, rule: RenameRule) -> Result<Vec<Prev
 
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::Arc;
-use tokio::fs as async_fs;
 use tokio::task;
 use futures::future::join_all;
 
@@ -278,9 +278,12 @@ async fn execute_rename_batch(
 
     // 生成唯一操作ID
     let operation_id = Uuid::new_v4().to_string();
+    let _operation_id_clone = operation_id.clone();
     let results = Arc::new(tokio::sync::Mutex::new(Vec::with_capacity(operations.len())));
     let success_count = Arc::new(AtomicUsize::new(0));
     let failed_count = Arc::new(AtomicUsize::new(0));
+    
+    // 初始化操作结果
 
     // 验证所有文件
     for op in &operations {
@@ -312,8 +315,7 @@ async fn execute_rename_batch(
             let parent_dir = old_path.parent().unwrap_or_else(|| Path::new("."));
             
             // 生成更安全的临时文件名
-            let temp_name = format!(".__temp_{}_{}_{}", 
-                operation_id, 
+            let temp_name = format!(".__temp_{}_{}", 
                 std::time::SystemTime::now()
                     .duration_since(std::time::UNIX_EPOCH)
                     .unwrap_or_default()
@@ -322,7 +324,6 @@ async fn execute_rename_batch(
                     .and_then(|s| s.to_str())
                     .unwrap_or("file")
             );
-            
             let temp_path = parent_dir.join(&temp_name);
             let target_path = parent_dir.join(&op.new_name);
             
@@ -330,6 +331,7 @@ async fn execute_rename_batch(
             match std::fs::rename(&old_path, &temp_path) {
                 Ok(_) => {
                     log_info!("🦀 [后端日志] 第一阶段成功: {:?} -> {:?}", old_path, temp_path);
+                    success_count.fetch_add(1, Ordering::SeqCst);
                     Some((temp_path, target_path, op))
                 }
                 Err(e) => {
@@ -421,16 +423,8 @@ async fn execute_rename_batch(
     
     log_info!("🦀 [后端日志] 批量重命名完成，成功: {}，失败: {}", success, failed);
     
-    // 保存操作记录到本地存储
-    let mut store = Store::new(
-        app_handle.config().tauri.bundle.identifier.clone(),
-        "rename_operations.json".into(),
-    );
-    
-    if let Err(e) = save_operation_record(&mut store, &operation_id, &final_results).await {
-        log_error!("🦀 [后端日志] 保存操作记录失败: {}", e);
-        // 不直接返回错误，因为重命名操作本身是成功的
-    }
+    // 保存操作记录
+    save_operation_record(&app_handle, &operation_id, &final_results)?;
     
     // 返回结果
     Ok(BatchRenameResult {
@@ -445,41 +439,55 @@ async fn execute_rename_batch(
 const RENAME_OPERATIONS_KEY: &str = "rename_operations";
 
 /// 保存操作记录到本地存储
-async fn save_operation_record(
-    store: &mut Store<'_>,
+fn save_operation_record(
+    app_handle: &tauri::AppHandle,
     operation_id: &str,
     results: &[RenameOperationResult],
 ) -> Result<(), String> {
-    // 读取现有的操作记录
-    let mut all_operations: std::collections::HashMap<String, Vec<RenameOperationResult>> = 
-        store.get(RENAME_OPERATIONS_KEY).and_then(|v| v).unwrap_or_default();
+    // 创建或加载存储
+    let store = app_handle.store("rename_operations.json")
+        .map_err(|e| format!("无法创建或加载存储: {}", e))?;
     
-    // 更新或添加新的操作记录
-    all_operations.insert(operation_id.to_string(), results.to_vec());
+    // 加载现有记录
+    let mut all_operations: std::collections::HashMap<String, Vec<RenameOperationResult>> = 
+        match store.get(RENAME_OPERATIONS_KEY) {
+            Some(value) => serde_json::from_value(value.clone())
+                .map_err(|e| format!("解析存储数据失败: {}", e))?,
+            None => std::collections::HashMap::new(),
+        };
+    
+    // 更新记录
+    all_operations.insert(operation_id.to_string(), results.to_owned());
     
     // 保存回存储
-    store.insert(RENAME_OPERATIONS_KEY.to_string(), all_operations)
-        .map_err(|e| format!("保存操作记录失败: {}", e))?;
-    
-    // 立即保存到磁盘
-    store.save().map_err(|e| format!("保存到磁盘失败: {}", e))?;
+    store.set(RENAME_OPERATIONS_KEY.to_string(), json!(all_operations));
+    store.save().map_err(|e| e.to_string())?;
     
     Ok(())
 }
 
 /// 从本地存储加载操作记录
-async fn load_operation_record(
-    store: &mut Store<'_>,
+fn load_operation_record(
+    app_handle: &tauri::AppHandle,
     operation_id: &str,
 ) -> Result<Vec<RenameOperationResult>, String> {
-    // 读取所有操作记录
+    // 创建或加载存储
+    let store = app_handle.store("rename_operations.json")
+        .map_err(|e| format!("无法创建或加载存储: {}", e))?;
+    
+    // 加载所有记录
     let all_operations: std::collections::HashMap<String, Vec<RenameOperationResult>> = 
-        store.get(RENAME_OPERATIONS_KEY).and_then(|v| v).unwrap_or_default();
+        match store.get(RENAME_OPERATIONS_KEY) {
+            Some(value) => serde_json::from_value(value.clone())
+                .map_err(|e| format!("解析存储数据失败: {}", e))?,
+            None => return Err(format!("找不到操作ID: {}", operation_id)),
+        };
     
     // 获取指定ID的记录
-    all_operations.get(operation_id)
+    all_operations
+        .get(operation_id)
         .cloned()
-        .ok_or_else(|| format!("找不到操作ID为 {} 的重命名记录", operation_id))
+        .ok_or_else(|| format!("找不到操作ID: {}", operation_id))
 }
 
 /// 单批次撤销接口（v3.0版本）
@@ -495,14 +503,8 @@ async fn undo_rename(
         return Err("操作ID不能为空".to_string());
     }
     
-    // 初始化存储
-    let mut store = Store::new(
-        app_handle.config().tauri.bundle.identifier.clone(),
-        "rename_operations.json".into(),
-    );
-    
     // 加载操作记录
-    let operation_results = load_operation_record(&mut store, &operation_id).await?;
+    let operation_results = load_operation_record(&app_handle, &operation_id)?;
     
     let mut restored_count = 0;
     let mut error_message = None;
@@ -542,11 +544,6 @@ async fn undo_rename(
             }
         }
     }
-    
-    // 如果所有操作都成功，可以选择删除该操作记录
-    // if restored_count > 0 && restored_count == operation_results.len() {
-    //     let _ = remove_operation_record(&mut store, &operation_id).await;
-    // }
     
     // 返回撤销结果
     Ok(UndoResult {

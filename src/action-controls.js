@@ -1,9 +1,12 @@
+import { getRenameController, RENAME_EVENTS as EVENTS } from './features/rename/rename-controller';
+
 /**
  * ActionControls - 操作区与流程控制管理器
  * 
  * 功能：
  * - "开始重命名"启用/禁用逻辑、二次确认与摘要
  * - "清空列表"清理列表/规则/预览/统计
+ * - 撤销/重做功能集成
  * - 快捷键与可访问性（焦点管理、ARIA）
  */
 
@@ -13,8 +16,7 @@ class ActionControls {
     this.isProcessing = false;
     this.lastOperationId = null;
     this.confirmationDialog = null;
-    this.undoStack = []; // 存储可撤销的操作
-    this.maxUndoSteps = 10; // 最大撤销步骤数
+    this.renameController = getRenameController();
     
     this.init();
   }
@@ -71,124 +73,27 @@ class ActionControls {
     if (this.elements.undoRename) {
       this.elements.undoRename.addEventListener('click', (e) => {
         e.preventDefault();
-        this.handleUndoAction();
-      });
     }
     
-    if (this.elements.applyRenameTop) {
-      this.elements.applyRenameTop.addEventListener('click', (e) => {
-        e.preventDefault();
-        this.handleRenameAction();
-      });
+    // 撤销重命名
+    if (undoRename) {
+      undoRename.addEventListener('click', () => this.handleUndoRename());
     }
     
-    // 清空列表按钮事件
-    if (this.elements.clearAll) {
-      this.elements.clearAll.addEventListener('click', (e) => {
-        e.preventDefault();
-        this.handleClearAction();
-      });
-    }
+    // 监听键盘快捷键
+    document.addEventListener('keydown', (e) => this.handleKeyDown(e));
     
-    if (this.elements.clearAllTop) {
-      this.elements.clearAllTop.addEventListener('click', (e) => {
-        e.preventDefault();
-        this.handleClearAction();
-      });
-    }
-    
-    // 全选按钮事件
-    if (this.elements.selectAll) {
-      this.elements.selectAll.addEventListener('change', (e) => {
-        this.handleSelectAllAction(e.target.checked);
-      });
-    }
-    
-    // 监听状态变化事件
-    document.addEventListener('refresh-apply', () => {
+    // 监听重命名控制器的历史记录变化
+    this.unsubscribeHistory = this.renameController.on(EVENTS.HISTORY_CHANGED, (state) => {
       this.updateButtonStates();
     });
-    
-    // 键盘快捷键
-    this.bindKeyboardShortcuts();
-    
-    console.log('✅ [ActionControls] 事件绑定完成');
   }
   
   /**
-   * 绑定键盘快捷键
+   * 处理重命名点击事件
    */
-  bindKeyboardShortcuts() {
-    document.addEventListener('keydown', (e) => {
-      // 避免在输入框中触发
-      const isTyping = this.isTypingContext(e.target);
-      if (isTyping) return;
-      
-      // Ctrl+Z / Cmd+Z - 撤销操作
-      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'z' && !e.shiftKey) {
-        e.preventDefault();
-        if (this.lastOperationId && !this.isProcessing) {
-          this.handleUndoAction();
-          this.announceToScreenReader('撤销上次重命名操作');
-        }
-        return;
-      }
-      
-      // Ctrl+Enter / Cmd+Enter - 开始重命名
-      if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') {
-        e.preventDefault();
-        if (this.canExecuteRename()) {
-          this.handleRenameAction();
-          this.announceToScreenReader('快捷键触发重命名操作');
-        }
-        return;
-      }
-      
-      // Ctrl+Shift+C / Cmd+Shift+C - 清空列表
-      if ((e.ctrlKey || e.metaKey) && e.shiftKey && e.key.toLowerCase() === 'c') {
-        e.preventDefault();
-        this.handleClearAction();
-        this.announceToScreenReader('快捷键触发清空操作');
-        return;
-      }
-      
-      // F5 - 刷新预览
-      if (e.key === 'F5') {
-        e.preventDefault();
-        if (window.previewManager) {
-          window.previewManager.updatePreview();
-          this.announceToScreenReader('刷新预览');
-        }
-        return;
-      }
-      
-      // Escape - 取消当前操作或关闭对话框
-      if (e.key === 'Escape') {
-        e.preventDefault();
-        this.handleEscapeAction();
-        return;
-      }
-    });
-  }
-  
-  /**
-   * 检查是否在输入上下文中
-   */
-  isTypingContext(element) {
-    if (!element) return false;
-    
-    const tagName = element.tagName.toLowerCase();
-    const isInput = tagName === 'input' || tagName === 'textarea' || tagName === 'select';
-    const isContentEditable = element.isContentEditable;
-    
-    return isInput || isContentEditable;
-  }
-  
-  /**
-   * 处理重命名操作
-   */
-  async handleRenameAction() {
-    console.log('🎮 [ActionControls] 处理重命名操作');
+  handleRenameClick() {
+    console.log('🎮 [ActionControls] 处理重命名点击事件');
     
     if (this.isProcessing) {
       console.log('⚠️ [ActionControls] 操作正在进行中，忽略重复请求');
@@ -206,14 +111,14 @@ class ActionControls {
       const summary = this.getOperationSummary();
       
       // 显示确认对话框
-      const confirmed = await this.showConfirmationDialog(summary);
+      const confirmed = this.showConfirmationDialog(summary);
       if (!confirmed) {
         console.log('🎮 [ActionControls] 用户取消了重命名操作');
         return;
       }
       
       // 执行重命名
-      await this.executeRename(summary);
+      this.executeRename(summary);
       
     } catch (error) {
       console.error('❌ [ActionControls] 重命名操作失败:', error);
@@ -222,62 +127,10 @@ class ActionControls {
   }
   
   /**
-   * 处理撤销操作
+   * 处理清空所有文件
    */
-  async handleUndoAction() {
-    console.log('🎮 [ActionControls] 处理撤销操作');
-    
-    if (this.isProcessing) {
-      console.log('⚠️ [ActionControls] 操作正在进行中，忽略撤销请求');
-      return;
-    }
-    
-    if (!this.lastOperationId) {
-      console.log('⚠️ [ActionControls] 没有可撤销的操作');
-      this.showError('没有可撤销的操作');
-      return;
-    }
-    
-    this.isProcessing = true;
-    this.updateButtonStates();
-    
-    try {
-      console.log(`🔄 [ActionControls] 正在撤销操作 ID: ${this.lastOperationId}`);
-      
-      // 调用后端的撤销API
-      const result = await window.__TAURI__.invoke('undo_rename', { 
-        operationId: this.lastOperationId 
-      });
-      
-      if (result.success) {
-        console.log(`✅ [ActionControls] 成功撤销 ${result.restored_count} 个文件`);
-        this.showSuccess(`已撤销 ${result.restored_count} 个文件的重命名`);
-        
-        // 清空操作ID，防止重复撤销
-        this.lastOperationId = null;
-        
-        // 刷新文件列表
-        if (window.previewManager) {
-          await window.previewManager.refreshFileList();
-        }
-      } else {
-        console.error(`❌ [ActionControls] 撤销失败: ${result.error_message || '未知错误'}`);
-        this.showError(`撤销失败: ${result.error_message || '未知错误'}`);
-      }
-    } catch (error) {
-      console.error('❌ [ActionControls] 撤销操作出错:', error);
-      this.showError(`撤销操作出错: ${error.message || '未知错误'}`);
-    } finally {
-      this.isProcessing = false;
-      this.updateButtonStates();
-    }
-  }
-  
-  /**
-   * 处理清空操作
-   */
-  async handleClearAction() {
-    console.log(' [ActionControls] 处理清空操作');
+  handleClearAll() {
+    console.log(' [ActionControls] 处理清空所有文件');
     
     const files = window.loadedFiles || [];
     if (files.length === 0) {
@@ -286,7 +139,7 @@ class ActionControls {
     }
     
     // 显示确认对话框
-    const confirmed = await this.showClearConfirmationDialog(files.length);
+    const confirmed = this.showClearConfirmationDialog(files.length);
     if (!confirmed) {
       console.log(' [ActionControls] 用户取消了清空操作');
       return;
@@ -305,10 +158,10 @@ class ActionControls {
   }
   
   /**
-   * 处理全选操作
+   * 处理全选/取消全选
    */
-  handleSelectAllAction(checked) {
-    console.log('🎮 [ActionControls] 处理全选操作:', checked);
+  handleSelectAll(checked) {
+    console.log('🎮 [ActionControls] 处理全选/取消全选:', checked);
     
     const files = window.loadedFiles || [];
     if (files.length === 0) return;
@@ -332,19 +185,48 @@ class ActionControls {
   }
   
   /**
-   * 处理Escape键操作
+   * 处理撤销重命名
    */
-  handleEscapeAction() {
-    // 关闭确认对话框
-    if (this.confirmationDialog && this.confirmationDialog.isVisible) {
-      this.confirmationDialog.close();
-      return;
-    }
+  async handleUndoRename() {
+    if (this.isProcessing) return;
     
-    // 取消当前处理
-    if (this.isProcessing) {
-      // 这里可以添加取消处理的逻辑
-      console.log('🎮 [ActionControls] 用户请求取消当前操作');
+    const { undoRename } = this.elements;
+    if (!undoRename || undoRename.disabled) return;
+    
+    try {
+      this.isProcessing = true;
+      this.updateButtonStates();
+      
+      // 使用 RenameController 处理撤销
+      const results = await this.renameController.undo();
+      
+      if (results && results.length > 0) {
+        // 更新文件列表
+        results.forEach(file => {
+          if (file.status === 'success') {
+            const index = window.loadedFiles.findIndex(f => f.path === file.original_path);
+            if (index !== -1) {
+              // 更新文件路径为原始路径
+              window.loadedFiles[index].path = file.new_path;
+              window.loadedFiles[index].name = file.new_path.split('/').pop();
+            }
+          }
+        });
+        
+        // 更新UI
+        if (window.updateFileTable) {
+          window.updateFileTable();
+        }
+        
+        // 显示成功消息
+        this.showToast('撤销重命名成功', 'success');
+      }
+    } catch (error) {
+      console.error('撤销重命名出错:', error);
+      this.showToast(`撤销重命名失败: ${error.message}`, 'error');
+    } finally {
+      this.isProcessing = false;
+      this.updateButtonStates();
     }
   }
   
@@ -432,7 +314,7 @@ class ActionControls {
   /**
    * 显示确认对话框
    */
-  async showConfirmationDialog(summary) {
+  showConfirmationDialog(summary) {
     return new Promise((resolve) => {
       // 创建确认对话框
       const dialog = this.createConfirmationDialog(summary, resolve);
@@ -580,7 +462,7 @@ class ActionControls {
   /**
    * 显示清空确认对话框
    */
-  async showClearConfirmationDialog(fileCount) {
+  showClearConfirmationDialog(fileCount) {
     return new Promise((resolve) => {
       const confirmed = confirm(`确定要清空所有 ${fileCount} 个文件吗？\n\n此操作将清除：\n- 所有已加载的文件\n- 当前的重命名规则设置\n- 预览结果\n\n此操作无法撤销。`);
       resolve(confirmed);
@@ -611,98 +493,37 @@ class ActionControls {
       
       // 生成操作ID（时间戳）
       const operationId = Date.now().toString();
-      this.lastOperationId = operationId;
-      console.log(`🆔 [ActionControls] 创建重命名操作 ID: ${operationId}`);
       
-      // 检查是否有实际的重命名函数可用
-      if (typeof window.executeRename === 'function') {
-        // 使用实际的重命名函数
-        await this.executeActualRename(filesToRename, summary);
-      } else {
-        // 模拟重命名过程
-        await this.executeSimulatedRename(filesToRename);
-      }
+      // 使用 RenameController 执行重命名
+      const results = await this.renameController.rename(filesToRename, operationId);
       
-      // 更新文件列表
-      const files = window.loadedFiles || [];
-      files.forEach(file => {
-        if (file.selected && file.newPath && file.newPath !== file.name) {
-          file.name = file.newPath;
-          file.path = file.path.replace(/[^/\\]+$/, file.newPath);
-          file.newPath = file.name; // 重置预览
+      if (results && results.length > 0) {
+        // 更新文件列表
+        results.forEach(file => {
+          if (file.status === 'success') {
+            const index = window.loadedFiles.findIndex(f => f.path === file.original_path);
+            if (index !== -1) {
+              // 更新文件路径为新路径
+              window.loadedFiles[index].path = file.new_path;
+              window.loadedFiles[index].name = file.new_path.split('/').pop();
+            }
+          }
+        });
+        
+        // 更新UI
+        if (window.updateFileTable) {
+          window.updateFileTable();
         }
-        file.selected = false; // 取消选择
-      });
-      
-      // 更新UI
-      if (typeof window.updateFileTable === 'function') {
-        window.updateFileTable();
+        
+        // 显示成功消息
+        this.showToast('重命名成功', 'success');
       }
-      
-      // 更新预览
-      if (window.previewManager) {
-        window.previewManager.updatePreview();
-      }
-      
-      // 显示成功信息
-      this.showSuccess(`成功重命名 ${filesToRename.length} 个文件`);
-      this.announceToScreenReader(`重命名操作完成，成功处理 ${filesToRename.length} 个文件`);
-      
     } catch (error) {
       console.error('❌ [ActionControls] 重命名失败:', error);
-      this.showError('重命名失败: ' + error.message);
-      this.announceToScreenReader('重命名操作失败: ' + error.message);
-      throw error;
+      this.showToast(`重命名失败: ${error.message}`, 'error');
     } finally {
       this.isProcessing = false;
       this.updateButtonStates();
-      
-      // 隐藏进度
-      if (window.statusBarManager) {
-        window.statusBarManager.hideProgress();
-      }
-    }
-  }
-  
-  /**
-   * 执行实际重命名（调用后端API）
-   */
-  async executeActualRename(filesToRename, summary) {
-    console.log('🎮 [ActionControls] 执行实际重命名');
-    
-    // 准备重命名参数
-    const filePaths = filesToRename.map(f => f.originalName);
-    const ruleData = this.getCurrentRuleData();
-    const activeTab = document.querySelector('.tab-content.active');
-    const activeTabId = activeTab ? activeTab.id.replace('tab-', '') : 'replace';
-    
-    // 调用实际的重命名函数
-    await window.executeRename(filePaths, activeTabId, ruleData);
-  }
-  
-  /**
-   * 执行模拟重命名（用于测试）
-   */
-  async executeSimulatedRename(filesToRename) {
-    console.log('🎮 [ActionControls] 执行模拟重命名');
-    
-    for (let i = 0; i < filesToRename.length; i++) {
-      const file = filesToRename[i];
-      
-      // 更新进度
-      if (window.statusBarManager) {
-        window.statusBarManager.showProgress(i + 1, filesToRename.length, file.originalName);
-      }
-      
-      // 模拟处理时间和可能的错误
-      await new Promise(resolve => setTimeout(resolve, 100));
-      
-      // 模拟随机错误（5%概率）
-      if (Math.random() < 0.05) {
-        throw new Error(`文件 "${file.originalName}" 重命名失败：权限不足`);
-      }
-      
-      console.log(`🎮 [ActionControls] 重命名: ${file.originalName} → ${file.newName}`);
     }
   }
   
@@ -791,56 +612,52 @@ class ActionControls {
    * 更新按钮状态
    */
   updateButtonStates() {
-    const canRename = this.canExecuteRename() && !this.isProcessing;
-    const hasFiles = (window.loadedFiles || []).length > 0;
+    const { applyRename, applyRenameTop, clearAll, clearAllTop, selectAll, undoRename } = this.elements;
     
-    // 更新重命名按钮
-    [this.elements.applyRename, this.elements.applyRenameTop].forEach(btn => {
-      if (btn) {
-        btn.disabled = !canRename;
-        btn.setAttribute('aria-disabled', !canRename);
-        
-        if (canRename) {
-          btn.title = '开始重命名选中的文件';
-        } else if (this.isProcessing) {
-          btn.title = '正在处理中...';
-        } else {
-          btn.title = '请选择文件并配置重命名规则';
-        }
+    // 检查是否有选中的文件
+    const hasFiles = window.loadedFiles && window.loadedFiles.length > 0;
+    const hasSelectedFiles = hasFiles && window.loadedFiles.some(file => file.selected);
+    const canRename = hasSelectedFiles && !this.isProcessing;
+    
+    // 更新按钮状态
+    if (applyRename) applyRename.disabled = !canRename;
+    if (applyRenameTop) applyRenameTop.disabled = !canRename;
+    
+    // 清空按钮：有文件且不在处理中时可点击
+    const canClear = hasFiles && !this.isProcessing;
+    if (clearAll) clearAll.disabled = !canClear;
+    if (clearAllTop) clearAllTop.disabled = !canClear;
+    
+    // 全选复选框：有文件时启用
+    if (selectAll) {
+      selectAll.disabled = !hasFiles;
+      // 更新选中状态
+      if (hasFiles) {
+        const allSelected = window.loadedFiles.every(file => file.selected);
+        selectAll.checked = allSelected;
+        selectAll.indeterminate = !allSelected && hasSelectedFiles;
+      } else {
+        selectAll.checked = false;
+        selectAll.indeterminate = false;
       }
-    });
-    
-    // 更新清空按钮
-    [this.elements.clearAll, this.elements.clearAllTop].forEach(btn => {
-      if (btn) {
-        btn.disabled = !hasFiles || this.isProcessing;
-        btn.setAttribute('aria-disabled', !hasFiles || this.isProcessing);
-        btn.title = hasFiles ? '清空所有文件和设置' : '没有文件可清空';
-      }
-    });
-    
-    // 更新全选按钮
-    if (this.elements.selectAll) {
-      const files = window.loadedFiles || [];
-      const selectedCount = files.filter(f => f.selected).length;
-      
-      this.elements.selectAll.disabled = files.length === 0;
-      this.elements.selectAll.indeterminate = selectedCount > 0 && selectedCount < files.length;
-      this.elements.selectAll.checked = files.length > 0 && selectedCount === files.length;
     }
     
-    // 更新撤销按钮
-    if (this.elements.undoRename) {
-      const canUndo = !!this.lastOperationId && !this.isProcessing;
-      this.elements.undoRename.disabled = !canUndo;
-      this.elements.undoRename.setAttribute('aria-disabled', !canUndo);
-      this.elements.undoRename.title = canUndo ? '撤销上次重命名操作 (Ctrl+Z)' : '没有可撤销的操作';
+    // 撤销按钮状态
+    if (undoRename) {
+      const canUndo = this.renameController.canUndo() && !this.isProcessing;
+      undoRename.disabled = !canUndo;
       
-      // 更新按钮的视觉状态
-      if (canUndo) {
-        this.elements.undoRename.classList.remove('disabled');
+      // 获取历史记录状态以显示可撤销的操作数量
+      const historyState = this.renameController.getHistoryState();
+      const undoCount = historyState.past.length;
+      
+      // 更新按钮标题和可访问性标签
+      if (canUndo && undoCount > 0) {
+        undoRename.title = `撤销 (${undoCount})`;
+        undoRename.setAttribute('aria-label', `撤销 (${undoCount} 个可撤销操作)`);
       } else {
-        this.elements.undoRename.classList.add('disabled');
+        undoRename.title = '撤销';
+        undoRename.setAttribute('aria-label', '撤销');
       }
     }
   }

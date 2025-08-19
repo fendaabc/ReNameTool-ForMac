@@ -310,7 +310,24 @@ function initializeMotionPreferences() {
 }
 
 // 在DOM加载后初始化动画偏好检测
-document.addEventListener('DOMContentLoaded', initializeMotionPreferences);
+document.addEventListener('DOMContentLoaded', () => {
+  initializeMotionPreferences();
+  
+  // 初始化撤销/重做控制器
+  try {
+    // 使用动态导入避免循环依赖
+    import('../features/undo-redo/undo-redo-controller.js')
+      .then(({ getUndoRedoController }) => {
+        window.undoRedoController = getUndoRedoController();
+        console.log('✅ UndoRedoController initialized');
+      })
+      .catch(error => {
+        console.error('Failed to initialize UndoRedoController:', error);
+      });
+  } catch (error) {
+    console.error('Error loading UndoRedoController:', error);
+  }
+});
 
 // 主题切换视觉通知现在由ThemeManager处理
 window.setLoadedFiles = (files) => {
@@ -1098,6 +1115,27 @@ function setupKeyboardShortcuts() {
         }
       } else {
         announceToScreenReader('请先选择要重命名的文件');
+      }
+      return;
+    }
+    
+    // 撤销操作 (Ctrl+Z / Cmd+Z)
+    if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'z' && !e.shiftKey) {
+      e.preventDefault();
+      const undoBtn = document.getElementById('undo-btn');
+      if (undoBtn && !undoBtn.disabled) {
+        undoBtn.click();
+      }
+      return;
+    }
+    
+    // 重做操作 (Ctrl+Shift+Z / Cmd+Shift+Z 或 Ctrl+Y / Cmd+Y)
+    if (((e.ctrlKey || e.metaKey) && e.shiftKey && e.key.toLowerCase() === 'z') || 
+        ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'y')) {
+      e.preventDefault();
+      const redoBtn = document.getElementById('redo-btn');
+      if (redoBtn && !redoBtn.disabled) {
+        redoBtn.click();
       }
       return;
     }

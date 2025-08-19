@@ -185,12 +185,28 @@ aside {
       .status-bar .status-right { color: var(--pico-secondary); }
     </style>
     <link rel="stylesheet" href="src/styles.css" />
+    <link rel="stylesheet" href="src/features/undo-redo/undo-redo.css" />
   </head>
   <body>
     <a href="#main-content" class="skip-link">跳转到主要内容</a>
     <header class="toolbar" style="padding: 0.5rem 1.5rem; background: var(--pico-background-color); border-bottom: 1px solid var(--pico-border-color); position: sticky; top: 0; z-index: 1000; display: flex; justify-content: space-between; align-items: center;">
       <div class="left-group" style="display: flex; align-items: center; gap: 1rem;">
         <img src="src-tauri/icons/32x32.png" alt="logo" style="width:32px;height:32px;">
+        <!-- 撤销/重做按钮组 -->
+        <div class="btn-group" role="group" aria-label="撤销重做操作">
+          <button id="undo-btn" class="secondary" disabled title="撤销 (Ctrl+Z)">
+            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M3 10h10a8 8 0 0 1 8 8v2M3 10l6 6m-6-6 6-6"></path>
+            </svg>
+            <span class="btn-label">撤销</span>
+          </button>
+          <button id="redo-btn" class="secondary" disabled title="重做 (Ctrl+Shift+Z)">
+            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M21 10H11a8 8 0 0 0-8 8v2m0 0 6-6m-6 6 6 6"></path>
+            </svg>
+            <span class="btn-label">重做</span>
+          </button>
+        </div>
         <h3 style="margin: 0; font-size: 1.2rem; color: var(--pico-color);">文件批量重命名</h3>
       </div>
       <div class="right-group" style="display: flex; align-items: center; gap: 0.75rem;">
