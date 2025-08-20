@@ -316,7 +316,7 @@ document.addEventListener('DOMContentLoaded', () => {
   // 初始化撤销/重做控制器
   try {
     // 使用动态导入避免循环依赖
-    import('../features/undo-redo/undo-redo-controller.js')
+    import('./features/undo-redo/undo-redo-controller.js')
       .then(({ getUndoRedoController }) => {
         window.undoRedoController = getUndoRedoController();
         console.log('✅ UndoRedoController initialized');

@@ -1,0 +1,155 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Status Bar Test</title>
+  <link href="https://cdn.jsdelivr.net/npm/@picocss/pico@1/css/pico.min.css" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet">
+  <style>
+    /* 添加测试样式 */
+    body {
+      padding: 20px;
+    }
+    .test-container {
+      max-width: 800px;
+      margin: 0 auto;
+      padding: 20px;
+    }
+    .test-button {
+      margin: 10px 0;
+    }
+    .test-result {
+      margin-top: 20px;
+      padding: 15px;
+      border-radius: 4px;
+      display: none;
+    }
+    .test-result.pass {
+      background-color: #e8f5e9;
+      border-left: 4px solid #4caf50;
+    }
+    .test-result.fail {
+      background-color: #ffebee;
+      border-left: 4px solid #f44336;
+    }
+  </style>
+</head>
+<body>
+  <div class="test-container">
+    <h1>状态栏测试</h1>
+    <p>点击下方按钮测试状态栏功能：</p>
+    
+    <button class="test-button" onclick="runLayoutTest()">测试布局</button>
+    <button class="test-button" onclick="testScrolling()">测试滚动</button>
+    <button class="test-button" onclick="testLayering()">测试层级</button>
+    
+    <div id="testResult" class="test-result"></div>
+    
+    <!-- 测试用的内容 -->
+    <div style="height: 2000px; margin-top: 20px; padding: 20px; border: 1px dashed #ccc;">
+      <p>滚动测试区域 - 滚动页面查看状态栏是否固定在底部</p>
+    </div>
+  </div>
+
+  <!-- 引入状态栏 -->
+  <div id="test-status-bar" class="status-bar">
+    <div class="status-container">
+      <div class="status-left">
+        <span class="status-item" title="总文件数"><span class="material-icons">description</span><span class="status-text">总数: <strong id="test-status-total">5</strong></span></span>
+        <span class="status-item" title="选中的文件"><span class="material-icons">check_box</span><span class="status-text">选中: <strong id="test-status-selected">2</strong></span></span>
+        <span class="status-item" title="已修改的文件"><span class="material-icons">edit</span><span class="status-text">修改: <strong id="test-status-changed">1</strong></span></span>
+        <span class="status-item status-warning" title="冲突的文件"><span class="material-icons">warning</span><span class="status-text">冲突: <strong id="test-status-conflicts">0</strong></span></span>
+        <span class="status-item status-error" title="无效的文件"><span class="material-icons">error</span><span class="status-text">无效: <strong id="test-status-invalid">0</strong></span></span>
+      </div>
+      <div class="status-right">
+        <span id="test-status-info" class="status-item" title="状态信息"><span class="material-icons">info</span><span class="status-text">测试状态</span></span>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    function showResult(message, isPass) {
+      const resultEl = document.getElementById('testResult');
+      resultEl.textContent = message;
+      resultEl.className = 'test-result ' + (isPass ? 'pass' : 'fail');
+      resultEl.style.display = 'block';
+    }
+
+    function runLayoutTest() {
+      const statusBar = document.getElementById('test-status-bar');
+      const container = statusBar.querySelector('.status-container');
+      const items = statusBar.querySelectorAll('.status-item');
+      
+      // 测试1：状态栏是否固定在底部
+      const rect = statusBar.getBoundingClientRect();
+      const isAtBottom = Math.abs(window.innerHeight - rect.bottom) < 5;
+      
+      // 测试2：是否单行显示
+      const isSingleLine = container.scrollHeight <= statusBar.offsetHeight;
+      
+      // 测试3：所有项目是否对齐
+      let allAligned = true;
+      items.forEach(item => {
+        const itemRect = item.getBoundingClientRect();
+        if (Math.abs(itemRect.top - rect.top) > 5) {
+          allAligned = false;
+        }
+      });
+      
+      if (isAtBottom && isSingleLine && allAligned) {
+        showResult('✅ 测试通过：状态栏布局正确', true);
+      } else {
+        let errors = [];
+        if (!isAtBottom) errors.push('状态栏未固定在底部');
+        if (!isSingleLine) errors.push('状态栏不是单行显示');
+        if (!allAligned) errors.push('状态项未对齐');
+        showResult('❌ 测试失败：' + errors.join('，'), false);
+      }
+    }
+
+    function testScrolling() {
+      const statusBar = document.getElementById('test-status-bar');
+      const leftSection = statusBar.querySelector('.status-left');
+      
+      // 添加更多项目以测试滚动
+      for (let i = 0; i < 10; i++) {
+        const item = document.createElement('span');
+        item.className = 'status-item';
+        item.innerHTML = `<span class="material-icons">fiber_manual_record</span><span class="status-text">测试${i+1}</span>`;
+        leftSection.appendChild(item);
+      }
+      
+      // 测试滚动
+      leftSection.scrollLeft = 100;
+      showResult('🔄 已添加测试项并尝试滚动。请检查状态栏是否可以水平滚动。', true);
+    }
+
+    function testLayering() {
+      // 创建一个覆盖层测试z-index
+      const overlay = document.createElement('div');
+      overlay.style.position = 'fixed';
+      overlay.style.top = '0';
+      overlay.style.left = '0';
+      overlay.style.width = '100%';
+      overlay.style.height = '100%';
+      overlay.style.background = 'rgba(0,0,0,0.5)';
+      overlay.style.zIndex = '999'; // 低于状态栏
+      overlay.style.display = 'flex';
+      overlay.style.justifyContent = 'center';
+      overlay.style.alignItems = 'center';
+      overlay.style.color = 'white';
+      overlay.style.fontSize = '24px';
+      overlay.textContent = '状态栏应该显示在此层之上';
+      
+      document.body.appendChild(overlay);
+      
+      // 3秒后移除覆盖层
+      setTimeout(() => {
+        document.body.removeChild(overlay);
+        showResult('👆 层级测试完成。状态栏应该始终显示在其他内容之上。', true);
+      }, 3000);
+    }
+  </script>
+</body>
+</html>

@@ -54,77 +54,70 @@ class StatusBarManager {
   /**
    * 更新状态信息
    */
-  updateStatus(stats) {
-    const {
-      total = 0,
-      displayed = total,
-      selected = 0,
-      changed = 0,
-      conflicts = 0,
-      invalid = 0,
-      processing = false,
-      currentFile = '',
-      info = '',
-      filtered = false
-    } = stats;
-    
+  updateStatus({ total = null, selected = null, changed = null, conflicts = null, invalid = null, info = null, progress = null } = {}) {
     // 更新总数
-    if (this.elements.total) {
-      if (filtered && displayed !== total) {
-        this.elements.total.textContent = `总计: ${displayed}/${total} 个文件`;
-      } else {
-        this.elements.total.textContent = `总计: ${total} 个文件`;
-      }
+    if (total !== null) {
+      this.elements.total.textContent = total;
+      this.elements.total.closest('.status-item').style.display = 'flex';
     }
-    
+
     // 更新选中数
-    if (this.elements.selected) {
-      this.elements.selected.textContent = `已选: ${selected} 个`;
-      this.elements.selected.style.display = selected > 0 ? '' : 'none';
+    if (selected !== null) {
+      this.elements.selected.textContent = selected;
+      const selectedEl = this.elements.selected.closest('.status-item');
+      selectedEl.style.display = selected > 0 ? 'flex' : 'none';
     }
-    
-    // 更新变更数
-    if (this.elements.changed) {
-      this.elements.changed.textContent = `将变更: ${changed} 个`;
-      this.elements.changed.style.display = changed > 0 ? '' : 'none';
+
+    // 更新修改数
+    if (changed !== null) {
+      this.elements.changed.textContent = changed;
+      const changedEl = this.elements.changed.closest('.status-item');
+      changedEl.style.display = changed > 0 ? 'flex' : 'none';
     }
-    
+
     // 更新冲突数
-    if (this.elements.conflicts) {
-      this.elements.conflicts.textContent = `冲突: ${conflicts} 个`;
-      this.elements.conflicts.style.display = conflicts > 0 ? '' : 'none';
+    if (conflicts !== null) {
+      this.elements.conflicts.textContent = conflicts;
+      const conflictsEl = this.elements.conflicts.closest('.status-item');
+      conflictsEl.style.display = conflicts > 0 ? 'flex' : 'none';
     }
-    
-    // 更新非法字符数
-    if (this.elements.invalid) {
-      this.elements.invalid.textContent = `非法: ${invalid} 个`;
-      this.elements.invalid.style.display = invalid > 0 ? '' : 'none';
+
+    // 更新无效数
+    if (invalid !== null) {
+      this.elements.invalid.textContent = invalid;
+      const invalidEl = this.elements.invalid.closest('.status-item');
+      invalidEl.style.display = invalid > 0 ? 'flex' : 'none';
     }
-    
-    // 更新进度信息
-    if (this.elements.progress) {
-      if (processing && currentFile) {
-        this.elements.progress.textContent = `正在处理: ${currentFile}`;
-        this.elements.progress.style.display = '';
-      } else if (processing) {
-        this.elements.progress.textContent = '处理中...';
-        this.elements.progress.style.display = '';
+
+    // 更新状态信息
+    if (info !== undefined) {
+      const infoText = this.elements.info.querySelector('.status-text');
+      infoText.textContent = info;
+      this.elements.info.style.display = info ? 'flex' : 'none';
+    }
+
+    // 更新进度条
+    if (progress !== undefined) {
+      const container = this.elements.progressContainer;
+      const progressBar = this.elements.progress;
+      const progressText = this.elements.progressText;
+
+      if (progress === null || progress < 0) {
+        // 隐藏进度条
+        container.style.display = 'none';
       } else {
-        this.elements.progress.style.display = 'none';
-      }
-    }
-    
-    // 更新信息
-    if (this.elements.info) {
-      if (info) {
-        this.elements.info.textContent = info;
-      } else if (conflicts > 0 || invalid > 0) {
-        this.elements.info.textContent = '存在错误，无法执行重命名';
-        this.elements.info.style.color = 'var(--pico-del-color)';
-      } else if (changed > 0) {
-        this.elements.info.textContent = '准备就绪';
-        this.elements.info.style.color = 'var(--pico-primary)';
-      } else {
+        // 显示并更新进度条
+        container.style.display = 'flex';
+        const progressValue = Math.min(100, Math.max(0, progress));
+        progressBar.value = progressValue;
+        progressText.textContent = `${Math.round(progressValue)}%`;
+        
+        // 根据进度值改变进度条颜色
+        if (progressValue >= 100) {
+          progressBar.classList.add('complete');
+        } else {
+          progressBar.classList.remove('complete');
+        }
         this.elements.info.textContent = '就绪';
         this.elements.info.style.color = '';
       }

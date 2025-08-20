@@ -243,7 +243,7 @@ aside {
     </header>
 
 
-    <main id="main-content" style="padding-bottom: 8rem; min-height: calc(100vh - 200px);">
+    <main id="main-content" style="padding-bottom: 3rem; min-height: calc(100vh - 200px);">
       <section style="display: flex; flex-direction: column; height:100%; overflow-y: auto; padding-bottom: 1rem;">
         <div id="drop-zone" class="card-group" style="border:2px dashed var(--pico-primary);border-radius:13px;padding:1.5rem 1rem;margin-bottom:1.2rem;background:#fafdff;display:flex;flex-direction:column;align-items:center;gap:0.85rem;transition:background 0.18s;">
   <div style="display:flex;gap:0.7rem;">
@@ -526,39 +526,36 @@ aside {
 
       </aside>
 
-      <!-- 状态信息栏 -->
-      <div class="status-info-bar" style="position: fixed; bottom: 3.5rem; left: 0.5rem; right: 0.5rem; padding: 0.75rem 1rem; background: var(--pico-card-background-color); border: 1px solid var(--pico-border-color); border-radius: 8px; box-shadow: 0 -2px 10px rgba(0,0,0,0.05); display: flex; justify-content: space-between; align-items: center; font-size: 0.9em; z-index: 999; margin: 0 1rem;">
-        <div class="status-counts" style="display: flex; gap: 1.5rem;">
-          <span id="status-total"><strong>总计:</strong> 0 个文件</span>
-          <span id="status-selected"><strong>已选:</strong> 0 个</span>
-          <span id="status-changed"><strong>将变更:</strong> 0 个</span>
-          <span id="status-conflicts" style="color: var(--pico-del-color); display: none;"><strong>冲突:</strong> 0 个</span>
-          <span id="status-invalid" style="color: var(--pico-del-color); display: none;"><strong>非法:</strong> 0 个</span>
-        </div>
-        <div class="status-actions" style="display: flex; gap: 1rem; align-items: center;">
+      <!-- 底部状态栏已移除 -->
+
           <div id="status-progress-container" style="display: none; align-items: center; gap: 0.5rem;">
             <progress id="status-progress-bar" value="0" max="100" style="width: 100px; height: 6px; border-radius: 3px; overflow: hidden;"></progress>
             <span id="status-progress-text" style="font-size: 0.85em;">0%</span>
           </div>
           <span id="status-progress" style="display: none; font-size: 0.9em; color: var(--pico-primary);">处理中...</span>
         </div>
-      </div>
-    </main>
+      </footer>
+      
+      <!-- 引入主题管理器 -->
+      <script src="src/theme-manager.js"></script>
+      <!-- 引入搜索过滤管理器 -->
+      <script src="src/search-filter-manager.js"></script>
+      <!-- 引入预览管理器 -->
+      <script src="src/preview-manager.js"></script>
+      <!-- 引入状态栏管理器 -->
+      <script src="src/status-bar-manager.js"></script>
+      <!-- 引入操作控制器 -->
+      <script src="src/action-controls.js"></script>
+      
+      <script>
+        console.log("🚀 开始设置应用");
 
-    <!-- 底部状态栏 -->
-    <footer class="status-bar" style="position: fixed; bottom: 0; left: 0; right: 0; padding: 0.5rem 1.5rem; background: var(--pico-background-color); border-top: 1px solid var(--pico-border-color); display: flex; justify-content: space-between; align-items: center; z-index: 1000; height: 2.5rem; backdrop-filter: blur(10px);">
-      <div class="status-left" style="font-size: 0.9em; color: var(--pico-muted-color);">
-        <span id="status-info">就绪</span>
-      </div>
-      <div class="status-right">
-        <small>ReName v1.0.0</small>
-      </div>
-    </footer>
-    
-    <!-- 引入主题管理器 -->
-    <script src="src/theme-manager.js"></script>
-    <!-- 引入搜索过滤管理器 -->
-    <script src="src/search-filter-manager.js"></script>
+          document.addEventListener("DOMContentLoaded", async function () {
+            // --- 大小写按钮组高亮与切换 ---
+            document.querySelectorAll('.case-btn').forEach(function(btn) {
+              btn.addEventListener('click', function() {
+                document.querySelectorAll('.case-btn').forEach(b=>b.classList.remove('active'));
+                btn.classList.add('active');
     <!-- 引入预览管理器 -->
     <script src="src/preview-manager.js"></script>
     <!-- 引入状态栏管理器 -->
@@ -1229,15 +1226,26 @@ aside {
 
   <!-- 底部状态栏 -->
   <footer id="status-bar" class="status-bar">
-    <div class="status-left">
-      <span>总数: <strong id="sb-total">0</strong></span>
-      <span>选中: <strong id="sb-selected">0</strong></span>
-      <span>成功: <strong id="sb-success">0</strong></span>
-      <span>失败: <strong id="sb-failed">0</strong></span>
-    </div>
-    <div class="status-right">
-      <span id="sb-message"></span>
+    <div class="status-container">
+      <!-- 左侧状态项 -->
+      <div class="status-left">
+        <span class="status-item" title="总文件数"><span class="material-icons">description</span><span class="status-text">总数: <strong id="status-total">0</strong></span></span>
+        <span class="status-item" title="选中的文件"><span class="material-icons">check_box</span><span class="status-text">选中: <strong id="status-selected">0</strong></span></span>
+        <span class="status-item" title="已修改的文件"><span class="material-icons">edit</span><span class="status-text">修改: <strong id="status-changed">0</strong></span></span>
+        <span class="status-item status-warning" title="冲突的文件"><span class="material-icons">warning</span><span class="status-text">冲突: <strong id="status-conflicts">0</strong></span></span>
+        <span class="status-item status-error" title="无效的文件"><span class="material-icons">error</span><span class="status-text">无效: <strong id="status-invalid">0</strong></span></span>
+      </div>
+      
+      <!-- 右侧状态项 -->
+      <div class="status-right">
+        <div id="status-progress-container" class="status-item" style="display: none; padding-right: 10px;">
+          <progress id="status-progress" value="0" max="100" style="width: 60px;"></progress>
+          <span id="status-progress-text" style="margin-left: 4px; font-size: 11px;">0%</span>
+        </div>
+        <span id="status-info" class="status-item" title="状态信息"><span class="material-icons">info</span><span class="status-text">就绪</span></span>
+      </div>
     </div>
   </footer>
+  <link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet">
 </body>
 </html>
